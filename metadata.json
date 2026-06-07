@@ -1,0 +1,6 @@
+{
+  "name": "NEFC Investment Portal",
+  "description": "Nation Empower Finance Capital (NEFC) investment schemes portal featuring Fixed Deposit and Recurring Deposit investments, interactive calculators, member dashboard, and comprehensive content and member admin controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
