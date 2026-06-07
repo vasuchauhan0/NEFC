@@ -2,8 +2,9 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import app from './app.ts';
-import dotenv from "dotenv";
-dotenv.config();
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env' });
+dotenv.config({ path: '../.env' });
 
 
 const __filename = fileURLToPath(import.meta.url);
