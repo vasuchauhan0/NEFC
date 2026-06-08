@@ -1,6 +1,9 @@
 import { getDatabase } from '../../shared/utils/db.ts';
 import { Member } from '../../shared/types/index.ts';
 
+// Active admin tokens store
+export const activeAdminTokens = new Set<string>();
+
 // Simple in-memory tracker for failed admin attempts to protect against brute forcing
 const adminTracker = {
   failedAttempts: 0,
@@ -34,7 +37,10 @@ export class AuthService {
       // Reset tracker on successful auth
       adminTracker.failedAttempts = 0;
       adminTracker.lockoutUntil = 0;
-      return { success: true, token: 'admin-session-token' };
+      // Generate a real random token instead of hardcoded string
+      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      activeAdminTokens.add(token);
+      return { success: true, token };
     }
 
     // 5. Handle authentication failure & progressive penalty

@@ -59,7 +59,7 @@ export default function App() {
         const isAdmin = localStorage.getItem('nefc_admin') === 'true';
         const url = isAdmin ? '/api/admin/data' : '/api/data';
         const headers: Record<string, string> = isAdmin 
-          ? { 'x-admin-token': 'admin-session-token' } 
+          ? { 'x-admin-token': localStorage.getItem('nefc_admin_token') || '' }
           : {};
         const response = await fetch(url, { headers });
         if (response.ok) {
@@ -156,10 +156,10 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         localStorage.setItem('nefc_admin', 'true');
-        localStorage.setItem('nefc_admin_token', 'admin-session-token');
+        localStorage.setItem('nefc_admin_token', data.token);
         // Fetch full data FIRST before switching to admin panel
         const adminRes = await fetch('/api/admin/data', {
-          headers: { 'x-admin-token': 'admin-session-token' }
+          headers: { 'x-admin-token': data.token }
         });
         if (adminRes.ok) {
           const adminData = await adminRes.json();
