@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { SiteData, Member, MemberInvestment, InvestmentScheme, ContactMessage } from '../types/index.ts';
+import { WebSocket } from 'ws';
+if (!globalThis.WebSocket) {
+  (globalThis as any).WebSocket = WebSocket;
+}
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
