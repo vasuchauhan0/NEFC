@@ -31,6 +31,14 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
+// Only serve frontend in development (not on Railway)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(distPath, 'index.html'));
+  });
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[NEFC MODULAR BACKEND] Secure service listening on port ${PORT}`);
 });
