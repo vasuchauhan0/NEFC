@@ -1,1 +1,1 @@
-{"build":{"buildCommand":"npm install"},"deploy":{"startCommand":"npx tsx src/server.ts","restartPolicyType":"always"}}
+{"build":{"buildCommand":"npm install"},"deploy":{"startCommand":"npx tsx backend/src/server.ts","restartPolicyType":"always"}}
