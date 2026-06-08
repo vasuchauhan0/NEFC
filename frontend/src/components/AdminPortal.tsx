@@ -46,6 +46,13 @@ interface AdminPortalProps {
 }
 
 export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPortalProps) {
+  // Safe fallbacks — prevents crash if admin data not loaded yet
+  const safeData = {
+    ...siteData,
+    members:  siteData.members  ?? [],
+    messages: siteData.messages ?? [],
+    schemes:  siteData.schemes  ?? [],
+  };
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [adminMobileOpen, setAdminMobileOpen] = useState<boolean>(false);
   
@@ -103,9 +110,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
   // Synchronize state with current data
   React.useEffect(() => {
-    if (siteData && siteData.schemes) {
+    if (siteData && safeData.schemes) {
       const sheet: Record<string, { interestPct: number; maturityAmountPreview: number }> = {};
-      siteData.schemes.forEach(s => {
+      safeData.schemes.forEach(s => {
         sheet[s.id] = {
           interestPct: s.interestPct,
           maturityAmountPreview: s.maturityAmountPreview
@@ -113,7 +120,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       });
       setRatesSheet(sheet);
     }
-  }, [siteData.schemes]);
+  }, [safeData.schemes]);
 
   const handleRatesSheetChange = (schemeId: string, interestPct: number, maturityAmountPreview: number) => {
     setRatesSheet(prev => ({
@@ -307,9 +314,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   };
 
   const getUniqueGeneratedMemberId = (): string => {
-    let index = siteData.members.length + 11;
+    let index = safeData.members.length + 11;
     let attemptedId = `NEFC-2026-0${index}`;
-    while (siteData.members.some(m => m.id === attemptedId)) {
+    while (safeData.members.some(m => m.id === attemptedId)) {
       index++;
       attemptedId = `NEFC-2026-0${index}`;
     }
@@ -344,7 +351,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     }
 
     // Verify Unique Email Requirement
-    const isEmailRegistered = siteData.members.some(
+    const isEmailRegistered = safeData.members.some(
       m => m.email.trim().toLowerCase() === mEmail.trim().toLowerCase() && m.id !== mId
     );
     if (isEmailRegistered) {
@@ -352,7 +359,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
-    const updatedMembers = [...siteData.members];
+    const updatedMembers = [...safeData.members];
     const memberObj: Member = {
       id: mId,
       name: mName,
@@ -383,7 +390,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Member Account',
       message: 'Are you sure you want to delete this member? All of their active and historical investment records will be permanently discarded from the system.',
       onConfirm: async () => {
-        const nextMembers = siteData.members.filter(m => m.id !== id);
+        const nextMembers = safeData.members.filter(m => m.id !== id);
         await handleSaveData({ ...siteData, members: nextMembers }, 'Member account deleted');
         setSelectedDetailMemberId(null);
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -416,7 +423,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
-    const updatedSchemes = [...siteData.schemes];
+    const updatedSchemes = [...safeData.schemes];
     const schemeObj: InvestmentScheme = {
       id: sId,
       type: sType,
@@ -443,7 +450,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Scheme Model',
       message: `Are you sure you want to delete the scheme "${id}"? This catalog plan option will no longer be visible to newly booked investments.`,
       onConfirm: async () => {
-        const next = siteData.schemes.filter(s => s.id !== id);
+        const next = safeData.schemes.filter(s => s.id !== id);
         await handleSaveData({ ...siteData, schemes: next }, 'Scheme discarded');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -453,14 +460,14 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   // INVESTMENTS BOOKING
   const handleOpenAddInvestment = (memberId: string) => {
     setInvestingMemberId(memberId);
-    const firstScheme = siteData.schemes.length > 0 ? siteData.schemes[0].id : '';
+    const firstScheme = safeData.schemes.length > 0 ? safeData.schemes[0].id : '';
     setNewInvestment({ schemeId: firstScheme, amount: 100000, startDate: new Date().toISOString().split('T')[0] });
     setShowInvestmentModal(true);
   };
 
   const handleAddInvestment = async () => {
-    const mem = siteData.members.find(m => m.id === investingMemberId);
-    const scheme = siteData.schemes.find(s => s.id === newInvestment.schemeId);
+    const mem = safeData.members.find(m => m.id === investingMemberId);
+    const scheme = safeData.schemes.find(s => s.id === newInvestment.schemeId);
     if (!mem || !scheme) {
       triggerToast('Invalid member or scheme parameters select', 'error');
       return;
@@ -478,7 +485,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       status: 'Active'
     };
 
-    const updatedMembers = siteData.members.map(m => {
+    const updatedMembers = safeData.members.map(m => {
       if (m.id === investingMemberId) {
         return {
           ...m,
@@ -494,13 +501,13 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
   const handleInlineAddInvestment = async (schemeType: 'fd' | 'rd') => {
     if (!selectedDetailMemberId) return;
-    const mem = siteData.members.find(m => m.id === selectedDetailMemberId);
+    const mem = safeData.members.find(m => m.id === selectedDetailMemberId);
     
     // Find the chosen scheme or dynamic default
     let targetSchemeId = inlineInvestment.schemeId;
-    let scheme = siteData.schemes.find(s => s.id === targetSchemeId);
+    let scheme = safeData.schemes.find(s => s.id === targetSchemeId);
     if (!scheme || scheme.type !== schemeType) {
-      const candidates = siteData.schemes.filter(s => s.type === schemeType && s.status !== 'Closed');
+      const candidates = safeData.schemes.filter(s => s.type === schemeType && s.status !== 'Closed');
       if (candidates.length > 0) {
         scheme = candidates[0];
         targetSchemeId = scheme.id;
@@ -524,7 +531,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       status: 'Active'
     };
 
-    const updatedMembers = siteData.members.map(m => {
+    const updatedMembers = safeData.members.map(m => {
       if (m.id === selectedDetailMemberId) {
         return {
           ...m,
@@ -549,7 +556,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Revoke Ledger Transaction',
       message: 'Are you sure you want to permanently revoke and delete this active investment ledger item? This action is irreversible and affects the member portfolio balance calculations.',
       onConfirm: async () => {
-        const updatedMembers = siteData.members.map(m => {
+        const updatedMembers = safeData.members.map(m => {
           if (m.id === memberId) {
             return {
               ...m,
@@ -570,7 +577,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
-    const updatedMembers = siteData.members.map(m => {
+    const updatedMembers = safeData.members.map(m => {
       if (m.id === memberId) {
         const nextInvestments = (m.investments || []).map(inv => {
           if (inv.id === investmentId) {
@@ -619,7 +626,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       nextPaidMonths.push(monthStr);
     }
 
-    const updatedMembers = siteData.members.map(m => {
+    const updatedMembers = safeData.members.map(m => {
       if (m.id === memberId) {
         const nextInvestments = (m.investments || []).map(inv => {
           if (inv.id === investmentId) {
@@ -700,7 +707,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Message',
       message: 'Are you sure you want to permanently delete this support request message from the inbox records?',
       onConfirm: async () => {
-        const remainingMsgs = siteData.messages.filter(m => m.id !== id);
+        const remainingMsgs = safeData.messages.filter(m => m.id !== id);
         await handleSaveData({ ...siteData, messages: remainingMsgs }, 'Message deleted from inbox');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -708,7 +715,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   };
 
   // Filters for render list
-  const filteredMembers = siteData.members.filter(m => {
+  const filteredMembers = safeData.members.filter(m => {
     const matchQuery = m.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
                        m.id.toLowerCase().includes(memberSearch.toLowerCase());
     const matchFilter = memberFilter === '' ? true : m.status === memberFilter;
@@ -716,8 +723,8 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   });
 
   // Calculate Metrics totals for Admin overview pane
-  const totalBonds = siteData.members.reduce((sum, m) => sum + (m.investments?.length || 0), 0);
-  const totalCapitalInPlay = siteData.members.reduce((sum, m) => {
+  const totalBonds = safeData.members.reduce((sum, m) => sum + (m.investments?.length || 0), 0);
+  const totalCapitalInPlay = safeData.members.reduce((sum, m) => {
     return sum + (m.investments || []).reduce((acc, inv) => {
       if (inv.schemeType === 'fd') return acc + inv.amount;
       const paidMonthsCount = inv.paidMonths ? inv.paidMonths.length : 0;
@@ -890,7 +897,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 <MessageSquare size={16} />
                 Prospect Messages
               </span>
-              {siteData.messages.filter(m => !m.read).length > 0 && (
+              {safeData.messages.filter(m => !m.read).length > 0 && (
                 <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black rounded-full tracking-wider uppercase animate-pulse">
                   NEW
                 </span>
@@ -963,7 +970,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Members</div>
                   <div className="text-2xl sm:text-3xl font-serif text-slate-800 font-bold mt-2">
-                    {siteData.members.length}
+                    {safeData.members.length}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">Registries listed in system</p>
                 </div>
@@ -984,7 +991,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Messages</div>
                   <div className="text-xl sm:text-3xl font-serif text-slate-800 font-bold mt-2">
-                    {siteData.messages.filter(m => !m.read).length}
+                    {safeData.messages.filter(m => !m.read).length}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">Unread support inquiries</p>
                 </div>
@@ -999,7 +1006,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   <div className="text-2xl sm:text-3xl font-bold text-amber-700 font-mono mt-2 group-hover:text-amber-850 transition-colors">
                     {(() => {
                       let count = 0;
-                      siteData.members.forEach(m => {
+                      safeData.members.forEach(m => {
                         if (m.status === 'Active') {
                           (m.investments || []).forEach(inv => {
                             if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
@@ -1015,7 +1022,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     <span>Outstanding Due</span>
                     <span className="font-semibold text-amber-700 font-mono text-[9px]">
                       {formatRupee(
-                        siteData.members.reduce((sum, m) => {
+                        safeData.members.reduce((sum, m) => {
                           if (m.status !== 'Active') return sum;
                           return sum + (m.investments || []).reduce((acc, inv) => {
                             if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
@@ -1041,7 +1048,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     </button>
                   </h4>
                   <div className="divide-y divide-slate-100 mt-3 max-h-80 overflow-y-auto">
-                    {siteData.messages.slice(0, 3).map((m) => (
+                    {safeData.messages.slice(0, 3).map((m) => (
                       <div key={m.id} className="py-3 text-xs">
                         <div className="flex justify-between font-semibold text-slate-800">
                           <span>{m.name} ({m.subject})</span>
@@ -1050,7 +1057,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                         <p className="text-slate-500 mt-1 line-clamp-2 leading-relaxed">{m.message}</p>
                       </div>
                     ))}
-                    {siteData.messages.length === 0 && (
+                    {safeData.messages.length === 0 && (
                       <p className="text-center text-slate-400 text-xs py-8">No current message logs.</p>
                     )}
                   </div>
@@ -1065,7 +1072,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     </button>
                   </h4>
                   <div className="divide-y divide-slate-100 mt-3">
-                    {siteData.members.slice(0, 3).map((m) => (
+                    {safeData.members.slice(0, 3).map((m) => (
                       <div key={m.id} className="py-3 flex justify-between items-center text-xs">
                         <div>
                           <div className="font-semibold text-slate-800">{m.name}</div>
@@ -1078,7 +1085,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                         </span>
                       </div>
                     ))}
-                    {siteData.members.length === 0 && (
+                    {safeData.members.length === 0 && (
                       <p className="text-center text-slate-400 text-xs py-8">No registered members roster in system database.</p>
                     )}
                   </div>
@@ -1113,7 +1120,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           member: Member;
                           investment: MemberInvestment;
                         }> = [];
-                        siteData.members.forEach(m => {
+                        safeData.members.forEach(m => {
                           if (m.status === 'Active') {
                             (m.investments || []).forEach(inv => {
                               if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
@@ -1148,7 +1155,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                             <td className="py-3.5 px-3 text-right">
                               <button
                                 onClick={async () => {
-                                  const updatedMembers = siteData.members.map(m => {
+                                  const updatedMembers = safeData.members.map(m => {
                                     if (m.id === member.id) {
                                       const updatedInvestments = m.investments.map(inv => {
                                         if (inv.id === investment.id) {
@@ -1322,7 +1329,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     Fixed Deposits Catalog SKU
                   </h4>
                   <div className="divide-y divide-slate-150 mt-3">
-                    {siteData.schemes.filter(s => s.type === 'fd').map((s) => (
+                    {safeData.schemes.filter(s => s.type === 'fd').map((s) => (
                       <div key={s.id} className="py-3 flex justify-between items-center text-xs">
                         <div>
                           <div className="font-mono font-bold text-slate-800 text-sm">{s.id}</div>
@@ -1355,7 +1362,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     Recurring Deposits Catalog SKU
                   </h4>
                   <div className="divide-y divide-slate-150 mt-3">
-                    {siteData.schemes.filter(s => s.type === 'rd').map((s) => (
+                    {safeData.schemes.filter(s => s.type === 'rd').map((s) => (
                       <div key={s.id} className="py-3 flex justify-between items-center text-xs">
                         <div>
                           <div className="font-mono font-bold text-slate-800 text-sm">{s.id}</div>
@@ -1401,7 +1408,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     <span className="block text-[9px] font-bold text-slate-400 uppercase">Received This Month</span>
                     <strong className="text-emerald-800 text-sm font-bold font-mono">
                       {formatRupee(
-                        siteData.members.reduce((sum, m) => {
+                        safeData.members.reduce((sum, m) => {
                           if (m.status !== 'Active') return sum;
                           return sum + (m.investments || []).reduce((acc, inv) => {
                             if (inv.schemeType === 'rd' && inv.status === 'Active' && (inv.paidMonths || []).includes('2026-06')) {
@@ -1417,7 +1424,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     <span className="block text-[9px] font-bold text-slate-400 uppercase">Outstanding Due</span>
                     <strong className="text-amber-800 text-sm font-bold font-mono">
                       {formatRupee(
-                        siteData.members.reduce((sum, m) => {
+                        safeData.members.reduce((sum, m) => {
                           if (m.status !== 'Active') return sum;
                           return sum + (m.investments || []).reduce((acc, inv) => {
                             if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
@@ -1453,7 +1460,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           member: Member;
                           investment: MemberInvestment;
                         }> = [];
-                        siteData.members.forEach(m => {
+                        safeData.members.forEach(m => {
                           if (m.status === 'Active') {
                             (m.investments || []).forEach(inv => {
                               if (inv.schemeType === 'rd' && inv.status === 'Active') {
@@ -1524,7 +1531,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                   <button
                                     onClick={async () => {
                                       // Log key paid item
-                                      const updatedMembers = siteData.members.map(m => {
+                                      const updatedMembers = safeData.members.map(m => {
                                         if (m.id === member.id) {
                                           const updatedInvestments = m.investments.map(inv => {
                                             if (inv.id === investment.id) {
@@ -1594,7 +1601,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 </h4>
 
                 <div className="space-y-4">
-                  {siteData.schemes.filter(s => s.type === 'fd').map((s) => {
+                  {safeData.schemes.filter(s => s.type === 'fd').map((s) => {
                     const currentRateObj = ratesSheet[s.id] || { interestPct: s.interestPct, maturityAmountPreview: s.maturityAmountPreview };
                     const autoFD = calculateFDMaturity(100000, currentRateObj.interestPct, s.durationYears);
                     
@@ -1683,7 +1690,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 </h4>
 
                 <div className="space-y-4">
-                  {siteData.schemes.filter(s => s.type === 'rd').map((s) => {
+                  {safeData.schemes.filter(s => s.type === 'rd').map((s) => {
                     const currentRateObj = ratesSheet[s.id] || { interestPct: s.interestPct, maturityAmountPreview: s.maturityAmountPreview };
                     const autoRD = calculateRDMaturity(5000, currentRateObj.interestPct, s.durationYears);
                     
@@ -1954,7 +1961,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       await fetch('/api/messages/mark-all-read', { method: 'POST' });
                       const updated = {
                         ...siteData,
-                        messages: siteData.messages.map(m => ({ ...m, read: true }))
+                        messages: safeData.messages.map(m => ({ ...m, read: true }))
                       };
                       await onUpdateData(updated);
                       triggerToast('Marked all as read', 'success');
@@ -1967,7 +1974,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
               </div>
 
               <div className="space-y-4">
-                {siteData.messages.map((m) => (
+                {safeData.messages.map((m) => (
                   <div 
                     key={m.id}
                     className={`border rounded-2xl p-5 shadow-xs bg-white transition-all duration-150 ${
@@ -2001,7 +2008,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ id: m.id, read: true })
                                 });
-                                const arr = siteData.messages.map(item => item.id === m.id ? { ...item, read: true } : item);
+                                const arr = safeData.messages.map(item => item.id === m.id ? { ...item, read: true } : item);
                                 await onUpdateData({ ...siteData, messages: arr });
                                 triggerToast('Message read');
                               } catch (_) {}
@@ -2029,7 +2036,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     </div>
                   </div>
                 ))}
-                {siteData.messages.length === 0 && (
+                {safeData.messages.length === 0 && (
                   <div className="bg-white border border-slate-150 p-12 rounded-2xl text-center text-slate-400">
                     No communication logs saved in backup.
                   </div>
@@ -2496,7 +2503,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Member Registration</label>
                 <span className="font-sans font-bold text-slate-800 bg-slate-100 px-3 py-2 rounded-xl block text-xs">
-                  {siteData.members.find(m => m.id === investingMemberId)?.name} ({investingMemberId})
+                  {safeData.members.find(m => m.id === investingMemberId)?.name} ({investingMemberId})
                 </span>
               </div>
 
@@ -2507,12 +2514,12 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   onChange={(e) => setNewInvestment({ ...newInvestment, schemeId: e.target.value })}
                   className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-850 rounded-xl text-xs font-semibold"
                 >
-                  {siteData.schemes.filter(s => s.status !== 'Closed').map((s) => (
+                  {safeData.schemes.filter(s => s.status !== 'Closed').map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.id} — {s.type.toUpperCase()} / {s.durationYears} Yr (@ {s.interestPct}% P.A.)
                     </option>
                   ))}
-                  {siteData.schemes.length === 0 && <option value="">No Active Models in Catalog</option>}
+                  {safeData.schemes.length === 0 && <option value="">No Active Models in Catalog</option>}
                 </select>
               </div>
 
@@ -2561,7 +2568,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
       {/* MODAL 4: DETAILED MEMBER VIEW & PORTFOLIO INVESTMENT CONTROL */}
       {selectedDetailMemberId && (() => {
-        const detailMember = siteData.members.find(m => m.id === selectedDetailMemberId);
+        const detailMember = safeData.members.find(m => m.id === selectedDetailMemberId);
         if (!detailMember) return null;
 
         const mInvestments = detailMember.investments || [];
@@ -2572,7 +2579,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
         const totalRDCommitment = rdBonds.reduce((acc, curr) => acc + curr.amount, 0);
 
         // Filter scheme choices for the active inline adding tab
-        const activeSchemes = siteData.schemes.filter(
+        const activeSchemes = safeData.schemes.filter(
           s => s.type === activeInvestmentSubTab && s.status !== 'Closed'
         );
 
@@ -3059,3 +3066,4 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     </div>
   );
 }
+
