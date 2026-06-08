@@ -5,7 +5,6 @@ import cors from 'cors';          // ADD THIS LINE
 import app from './app.ts';
 import 'dotenv/config';
 
-import 'dotenv/config';
 
 
 const __filename = fileURLToPath(import.meta.url);
