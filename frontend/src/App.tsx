@@ -65,6 +65,14 @@ export default function App() {
         if (response.ok) {
           const data = await response.json();
           setSiteData(data);
+        } else if (response.status === 401) {
+          // Token expired (server restarted) — clear admin session, load public data
+          localStorage.removeItem('nefc_admin');
+          localStorage.removeItem('nefc_admin_token');
+          setIsAdminLoggedIn(false);
+          setActivePage('home');
+          const publicRes = await fetch('/api/data');
+          if (publicRes.ok) setSiteData(await publicRes.json());
         }
       } catch (err) {
         console.error('Failed to load backend system data record', err);

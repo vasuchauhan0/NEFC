@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://your-app.vercel.app', // replace after Vercel deploy
+    'https://nefc-ten.vercel.app', // replace after Vercel deploy
   ],
   credentials: true,
 }));
