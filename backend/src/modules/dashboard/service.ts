@@ -1,8 +1,22 @@
 import { getDatabase } from '../../shared/utils/db.ts';
-import { SiteData } from '../../shared/types/index.ts';
 
 export class DashboardService {
-  async getFullData(): Promise<SiteData> {
+  // Public data only
+  async getPublicData() {
+    const data = await getDatabase() as any;
+    return {
+      company:      data.company,
+      hero:         data.hero,
+      announcement: data.announcement,
+      stats:        data.stats,
+      steps:        data.steps,
+      trust:        data.trust,
+      schemes:      data.schemes,
+    };
+  }
+
+  // Full data for admin
+  async getFullData() {
     return getDatabase();
   }
 }

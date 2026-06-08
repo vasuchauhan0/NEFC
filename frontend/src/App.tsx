@@ -56,7 +56,12 @@ export default function App() {
   useEffect(() => {
     const fetchRecordData = async () => {
       try {
-        const response = await fetch('/api/data');
+        const isAdmin = localStorage.getItem('nefc_admin') === 'true';
+        const url = isAdmin ? '/api/admin/data' : '/api/data';
+        const headers: Record<string, string> = isAdmin 
+          ? { 'x-admin-token': 'admin-session-token' } 
+          : {};
+        const response = await fetch(url, { headers });
         if (response.ok) {
           const data = await response.json();
           setSiteData(data);
@@ -152,6 +157,15 @@ export default function App() {
       if (data.success) {
         setIsAdminLoggedIn(true);
         localStorage.setItem('nefc_admin', 'true');
+        localStorage.setItem('nefc_admin_token', 'admin-session-token');
+        // Fetch full data including members for admin
+        const adminRes = await fetch('/api/admin/data', {
+          headers: { 'x-admin-token': 'admin-session-token' }
+        });
+        if (adminRes.ok) {
+          const adminData = await adminRes.json();
+          setSiteData(adminData);
+        }
         setActivePage('admin');
         setAdminPass('');
       } else {
@@ -170,6 +184,7 @@ export default function App() {
     setActivePage('home');
     localStorage.removeItem('nefc_member');
     localStorage.removeItem('nefc_admin');
+    localStorage.removeItem('nefc_admin_token');  // ← ADD THIS LINE
   };
 
   if (loading || !siteData) {
