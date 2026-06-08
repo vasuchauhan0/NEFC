@@ -1,17 +1,35 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 import { spawn } from 'child_process';
+import net from 'net';  // ADD THIS
+
+// ADD THIS FUNCTION
+function waitForPort(port: number, retries = 30, delay = 500): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const check = () => {
+      const socket = net.createConnection(port, '127.0.0.1');
+      socket.on('connect', () => { socket.destroy(); resolve(); });
+      socket.on('error', () => {
+        socket.destroy();
+        if (++attempts >= retries) return reject(new Error(`Port ${port} not ready`));
+        setTimeout(check, delay);
+      });
+    };
+    check();
+  });
+}
 
 export default defineConfig(() => {
   return {
     plugins: [
-      react(), 
+      react(),
       tailwindcss(),
       {
         name: 'express-server',
-        configureServer() {
+        async configureServer() {  // ADD async
           console.log('[Express Plugin] Spawning backend server on port 3001...');
           const child = spawn('npx', ['tsx', './backend/src/server.ts'], {
             stdio: 'inherit',
@@ -19,6 +37,9 @@ export default defineConfig(() => {
             env: { ...process.env, PORT: '3001', NODE_ENV: 'development' }
           });
           process.on('exit', () => child.kill());
+
+          await waitForPort(3001);  // ADD THIS — waits before Vite starts proxying
+          console.log('[Express Plugin] Backend ready ✓');
         }
       }
     ],
@@ -30,14 +51,19 @@ export default defineConfig(() => {
     server: {
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'http://127.0.0.1:3001',  // CHANGED: localhost → 127.0.0.1
           changeOrigin: true,
+          configure: (proxy) => {           // ADD THIS error handler
+            proxy.on('error', (err, _req, res) => {
+              if ((err as any).code === 'ECONNREFUSED') {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Backend starting, please retry' }));
+              }
+            });
+          },
         }
       },
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
