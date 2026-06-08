@@ -155,10 +155,9 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
-        setIsAdminLoggedIn(true);
         localStorage.setItem('nefc_admin', 'true');
         localStorage.setItem('nefc_admin_token', 'admin-session-token');
-        // Fetch full data including members for admin
+        // Fetch full data FIRST before switching to admin panel
         const adminRes = await fetch('/api/admin/data', {
           headers: { 'x-admin-token': 'admin-session-token' }
         });
@@ -166,6 +165,8 @@ export default function App() {
           const adminData = await adminRes.json();
           setSiteData(adminData);
         }
+        // Only switch to admin panel AFTER data is loaded
+        setIsAdminLoggedIn(true);
         setActivePage('admin');
         setAdminPass('');
       } else {
