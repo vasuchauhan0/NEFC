@@ -27,6 +27,8 @@ import LoginPage from './features/auth/pages/LoginPage.tsx';
 import AdminLoginPage from './features/auth/pages/AdminLoginPage.tsx';
 import AdminPortal from './components/AdminPortal.tsx';
 
+const API = import.meta.env.VITE_API_URL || '';
+
 export default function App() {
   const [siteData, setSiteData] = useState<SiteData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -36,7 +38,6 @@ export default function App() {
   return 'home';
   });
 
-  // Authenticated states
   const [loggedInMember, setLoggedInMember] = useState<Member | null>(() => {
   const saved = localStorage.getItem('nefc_member');
   return saved ? JSON.parse(saved) : null;
@@ -44,7 +45,6 @@ export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
   return localStorage.getItem('nefc_admin') === 'true';
   });
-  // Login form systems
   const [loginTab, setLoginTab] = useState<'member' | 'admin'>('member');
   const [memberEmail, setMemberEmail] = useState<string>('');
   const [memberPass, setMemberPass] = useState<string>('');
@@ -52,12 +52,11 @@ export default function App() {
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
 
-  // Load site registers on initial load
   useEffect(() => {
     const fetchRecordData = async () => {
       try {
         const isAdmin = localStorage.getItem('nefc_admin') === 'true';
-        const url = isAdmin ? '/api/admin/data' : '/api/data';
+        const url = isAdmin ? `${API}/api/admin/data` : `${API}/api/data`;
         const headers: Record<string, string> = isAdmin 
           ? { 'x-admin-token': localStorage.getItem('nefc_admin_token') || '' }
           : {};
@@ -66,12 +65,11 @@ export default function App() {
           const data = await response.json();
           setSiteData(data);
         } else if (response.status === 401) {
-          // Token expired (server restarted) — clear admin session, load public data
           localStorage.removeItem('nefc_admin');
           localStorage.removeItem('nefc_admin_token');
           setIsAdminLoggedIn(false);
           setActivePage('home');
-          const publicRes = await fetch('/api/data');
+          const publicRes = await fetch(`${API}/api/data`);
           if (publicRes.ok) setSiteData(await publicRes.json());
         }
       } catch (err) {
@@ -83,26 +81,21 @@ export default function App() {
     fetchRecordData();
   }, []);
 
-  // Check once on initial mount for secret URL query parameters or hash to switch to admin-login
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const isParam = window.location.search.includes('admin=true');
       const isHash = window.location.hash.includes('admin');
       if (isParam || isHash) {
         setActivePage('admin-login');
-        // Clean URL to prevent any refresh loops or trace
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
   }, []);
 
-
-
-  // Sync state back to the node backup backend database
   const handleUpdateData = async (newData: SiteData) => {
     setSiteData(newData);
     try {
-      await fetch('/api/data/import', {
+      await fetch(`${API}/api/data/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newData)
@@ -112,7 +105,6 @@ export default function App() {
     }
   };
 
-  // Login Handlers
   const handleMemberLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!memberEmail.trim() || !memberPass.trim()) {
@@ -121,9 +113,8 @@ export default function App() {
     }
     setLoginError('');
     setLoginLoading(true);
-
     try {
-      const res = await fetch('/api/login/member', {
+      const res = await fetch(`${API}/api/login/member`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: memberEmail, password: memberPass })
@@ -133,7 +124,6 @@ export default function App() {
         setLoggedInMember(data.member);
         localStorage.setItem('nefc_member', JSON.stringify(data.member));
         setActivePage('dashboard');
-        // Reset fields
         setMemberEmail('');
         setMemberPass('');
       } else {
@@ -154,9 +144,8 @@ export default function App() {
     }
     setLoginError('');
     setLoginLoading(true);
-
     try {
-      const res = await fetch('/api/login/admin', {
+      const res = await fetch(`${API}/api/login/admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: adminPass })
@@ -165,15 +154,13 @@ export default function App() {
       if (data.success) {
         localStorage.setItem('nefc_admin', 'true');
         localStorage.setItem('nefc_admin_token', data.token);
-        // Fetch full data FIRST before switching to admin panel
-        const adminRes = await fetch('/api/admin/data', {
+        const adminRes = await fetch(`${API}/api/admin/data`, {
           headers: { 'x-admin-token': data.token }
         });
         if (adminRes.ok) {
           const adminData = await adminRes.json();
           setSiteData(adminData);
         }
-        // Only switch to admin panel AFTER data is loaded
         setIsAdminLoggedIn(true);
         setActivePage('admin');
         setAdminPass('');
@@ -193,7 +180,7 @@ export default function App() {
     setActivePage('home');
     localStorage.removeItem('nefc_member');
     localStorage.removeItem('nefc_admin');
-    localStorage.removeItem('nefc_admin_token');  // ← ADD THIS LINE
+    localStorage.removeItem('nefc_admin_token');
   };
 
   if (loading || !siteData) {
@@ -207,7 +194,6 @@ export default function App() {
     );
   }
 
-  // Handle direct admin panels route overrides
   if (activePage === 'admin' && isAdminLoggedIn) {
     return (
       <AdminPortal 
@@ -221,10 +207,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
       <div>
-        {/* Banner Announcement */}
         <AnnouncementBar text={siteData.announcement} />
-
-        {/* Global Public Navigation Bar */}
         <PublicNav 
           activePage={activePage} 
           company={siteData.company} 
@@ -235,8 +218,6 @@ export default function App() {
           isAdminLoggedIn={isAdminLoggedIn}
           onEnterAdmin={() => setActivePage('admin')}
         />
-
-        {/* Routing content blocks */}
         <main>
           {activePage === 'home' && (
             <HomeView 
@@ -247,26 +228,18 @@ export default function App() {
               navigate={setActivePage} 
             />
           )}
-
           {activePage === 'schemes' && (
-            <SchemesView 
-              schemes={siteData.schemes} 
-              navigate={setActivePage} 
-            />
+            <SchemesView schemes={siteData.schemes} navigate={setActivePage} />
           )}
-
           {activePage === 'calculator' && (
             <CalculatorView schemes={siteData.schemes} />
           )}
-
           {activePage === 'about' && (
             <AboutView company={siteData.company} />
           )}
-
           {activePage === 'contact' && (
             <ContactView company={siteData.company} />
           )}
-
           {activePage === 'dashboard' && loggedInMember && (
             <MemberDashboard 
               member={loggedInMember} 
@@ -275,15 +248,13 @@ export default function App() {
               company={siteData.company}
             />
           )}
-
-          {/* DUAL PORTAL REGISTER & LOGIN SCREEN */}
           {activePage === 'login' && (
             <LoginPage
               onMemberLogin={async (email, pass) => {
                 setLoginError('');
                 setLoginLoading(true);
                 try {
-                  const res = await fetch('/api/login/member', {
+                  const res = await fetch(`${API}/api/login/member`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password: pass })
@@ -310,23 +281,29 @@ export default function App() {
               navigate={setActivePage}
             />
           )}
-
-          {/* SECRET ADMIN ONLY LOGIN SCREEN */}
           {activePage === 'admin-login' && (
             <AdminLoginPage
               onAdminLogin={async (pass) => {
                 setLoginError('');
                 setLoginLoading(true);
                 try {
-                  const res = await fetch('/api/login/admin', {
+                  const res = await fetch(`${API}/api/login/admin`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password: pass })
                   });
                   const data = await res.json();
                   if (data.success) {
-                    setIsAdminLoggedIn(true);
                     localStorage.setItem('nefc_admin', 'true');
+                    localStorage.setItem('nefc_admin_token', data.token);
+                    const adminRes = await fetch(`${API}/api/admin/data`, {
+                      headers: { 'x-admin-token': data.token }
+                    });
+                    if (adminRes.ok) {
+                      const adminData = await adminRes.json();
+                      setSiteData(adminData);
+                    }
+                    setIsAdminLoggedIn(true);
                     setActivePage('admin');
                     setAdminPass('');
                   } else {
@@ -347,7 +324,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* Institutional footer */}
       <footer className="bg-slate-900 border-t border-slate-950 text-slate-400 text-xs py-12 select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-3 gap-8">
           <div>
@@ -371,12 +347,9 @@ export default function App() {
             </div>
           </div>
         </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800/60 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
           <span 
-            onDoubleClick={() => {
-              setActivePage('admin-login');
-            }}
+            onDoubleClick={() => setActivePage('admin-login')}
             className="select-none text-slate-500"
           >
             {siteData.company.copyright}
