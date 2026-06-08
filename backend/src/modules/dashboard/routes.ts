@@ -1,13 +1,18 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { DashboardController } from './controller.ts';
-import { activeAdminTokens } from '../auth/service.ts';
+import { verifyAdminToken } from '../../shared/utils/db.ts';
 
 const router = Router();
 const controller = new DashboardController();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction) {
+async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const token = req.headers['x-admin-token'] as string;
-  if (!token || !activeAdminTokens.has(token)) {
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const valid = await verifyAdminToken(token);
+  if (!valid) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

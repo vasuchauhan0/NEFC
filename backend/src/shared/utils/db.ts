@@ -193,3 +193,17 @@ export async function saveDatabase(data: SiteData): Promise<void> {
 export async function getDatabasePath(): Promise<string> {
   return 'supabase';
 }
+
+// ─── Admin Token Storage ──────────────────────────────────────────────────────
+export async function saveAdminToken(token: string): Promise<void> {
+  await supabase.from('admin_tokens').insert({ token });
+}
+
+export async function verifyAdminToken(token: string): Promise<boolean> {
+  const { data } = await supabase.from('admin_tokens').select('token').eq('token', token).single();
+  return !!data;
+}
+
+export async function deleteAdminToken(token: string): Promise<void> {
+  await supabase.from('admin_tokens').delete().eq('token', token);
+}
