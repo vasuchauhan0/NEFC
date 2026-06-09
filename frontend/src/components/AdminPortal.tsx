@@ -344,6 +344,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     const mCity = fd.get('city') as string;
     const mPass = fd.get('password') as string;
     const mStatus = fd.get('status') as Member['status'];
+    const mMemberSince = fd.get('memberSince') as string;
 
     if (!mId || !mName || !mEmail) {
       triggerToast('Fill in all key credentials', 'error');
@@ -368,7 +369,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       city: mCity,
       password: mPass || 'nefc@123',
       status: mStatus,
-      memberSince: selectedMember?.memberSince || new Date().toISOString().split('T')[0],
+      memberSince: mMemberSince || selectedMember?.memberSince || new Date().toISOString().split('T')[0],
       investments: selectedMember?.investments || []
     };
 
@@ -2296,6 +2297,15 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   />
                 </div>
               </div>
+              <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Member Since</label>
+  <input
+    type="date"
+    name="memberSince"
+    defaultValue={selectedMember?.memberSince || new Date().toISOString().split('T')[0]}
+       className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-semibold font-mono"
+       />
+        </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
