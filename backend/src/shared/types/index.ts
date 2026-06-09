@@ -86,4 +86,6 @@ export interface SiteData {
   schemes: InvestmentScheme[];
   members: Member[];
   messages: ContactMessage[];
+  adminFailedAttempts?: number;
+  adminLockoutUntil?: number;
 }
