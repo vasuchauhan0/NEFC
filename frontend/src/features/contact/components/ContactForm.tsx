@@ -30,7 +30,14 @@ export default function ContactForm({ onSuccess, success }: ContactFormProps) {
       setError('Please enter your full name.');
       return;
     }
-    if (!email.trim() && !phone.trim()) {
+    if (!email.trim() && !phone.trim()) {if (!phone.trim()) {
+  setError('Please enter your Phone Number.');
+  return;
+}
+if (!email.trim() && !phone.trim()) {
+  setError('Please enter at least one contact — Email or Phone Number.');
+  return;
+}
       setError('Please enter at least one contact — Email or Phone Number.');
       return;
     }
@@ -46,7 +53,7 @@ export default function ContactForm({ onSuccess, success }: ContactFormProps) {
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, contact: email || phone })
+        body: JSON.stringify({ ...formData, contact: email, phone: phone })
       });
       const resData = await response.json();
       if (resData.success) {
@@ -114,6 +121,7 @@ export default function ContactForm({ onSuccess, success }: ContactFormProps) {
             <input
               type="tel"
               id="phone"
+              required
               value={formData.phone}
               onChange={handleInput}
               disabled={loading}

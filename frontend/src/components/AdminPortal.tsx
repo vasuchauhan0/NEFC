@@ -1983,7 +1983,10 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           )}
                         </div>
                         <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
-                          <span className="font-mono">Channels: {m.contact}</span>
+                          <span className="font-mono">
+  Email: {m.contact}
+  {m.phone ? ` • Phone: ${m.phone}` : ''}
+</span>
                           <span>•</span>
                           <span>Logs: {formatDateReadable(m.date)}</span>
                         </div>
