@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import cors from 'cors';
 import 'dotenv/config';
 
 
@@ -18,6 +19,14 @@ import otpRouter from './modules/auth/otp.ts';
 const app: Express = express();
 
 // Middlewares
+// Middlewares
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://nefc-ten.vercel.app',
+  ],
+  credentials: true,
+}));
 app.use(express.json());
 
 

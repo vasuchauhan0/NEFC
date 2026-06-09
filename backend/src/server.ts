@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import cors from 'cors';
 import app from './app.ts';
 import 'dotenv/config';
 
@@ -9,13 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // CORS
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://nefc-ten.vercel.app', // replace after Vercel deploy
-  ],
-  credentials: true,
-}));
+
 
 // Only serve frontend static files in development
 if (process.env.NODE_ENV !== 'production') {
