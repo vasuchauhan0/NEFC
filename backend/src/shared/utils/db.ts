@@ -196,7 +196,9 @@ export async function getDatabasePath(): Promise<string> {
 
 // ─── Admin Token Storage ──────────────────────────────────────────────────────
 export async function saveAdminToken(token: string): Promise<void> {
+  const now = new Date().toISOString();
   const expires_at = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+  await supabase.from('admin_tokens').delete().lt('expires_at', now);
   await supabase.from('admin_tokens').insert({ token, expires_at });
 }
 
