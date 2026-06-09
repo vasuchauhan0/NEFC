@@ -38,21 +38,21 @@ export default function RDSchemesTable({ schemes }: RDSchemesTableProps) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="py-3 px-4 text-xs font-semibold uppercase text-slate-500 tracking-wider">Plan ID</th>
-              <th className="py-3 px-4 text-xs font-semibold uppercase text-slate-500 tracking-wider">Duration</th>
-              <th className="py-3 px-4 text-xs font-semibold uppercase text-slate-500 tracking-wider">Interest Rate</th>
-              <th className="py-3 px-4 text-xs font-semibold uppercase text-slate-500 tracking-wider">Maturity / ₹5K/mo</th>
-              <th className="py-3 px-4 text-xs font-semibold uppercase text-slate-500 tracking-wider">Tag</th>
+              <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Plan</th>
+              <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Duration</th>
+              <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Rate</th>
+              <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Maturity</th>
+              <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Tag</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-150">
             {schemes.map((s) => (
               <tr key={s.id} className="hover:bg-slate-50/50 transition-colors duration-150">
-                <td className="py-4 px-4 font-mono text-sm font-semibold text-slate-800">{s.id}</td>
-                <td className="py-4 px-4 text-sm text-slate-600">{s.durationYears} {s.durationYears === 1 ? 'Year' : 'Years'}</td>
-                <td className="py-4 px-4 text-sm font-semibold text-blue-700 font-sans">{s.interestPct.toFixed(1)}% p.a.</td>
-                <td className="py-4 px-4 text-sm font-semibold text-slate-800 font-mono">{formatRupee(s.maturityAmountPreview)}</td>
-                <td className="py-4 px-4">{getStatusBadge(s.status)}</td>
+                <td className="py-3 px-2 sm:py-4 sm:px-4 font-mono text-xs sm:text-sm font-semibold text-slate-800">{s.id}</td>
+                <td className="py-3 px-2 sm:py-4 sm:px-4 text-xs sm:text-sm text-slate-600 whitespace-nowrap">{s.durationYears} {s.durationYears === 1 ? 'Yr' : 'Yrs'}</td>
+                <td className="py-3 px-2 sm:py-4 sm:px-4 text-xs sm:text-sm font-semibold text-blue-700 whitespace-nowrap">{s.interestPct.toFixed(1)}%</td>
+                <td className="py-3 px-2 sm:py-4 sm:px-4 text-xs sm:text-sm font-semibold text-slate-800 font-mono whitespace-nowrap">{formatRupee(s.maturityAmountPreview)}</td>
+                <td className="py-3 px-2 sm:py-4 sm:px-4">{getStatusBadge(s.status)}</td>
               </tr>
             ))}
             {schemes.length === 0 && (
@@ -65,4 +65,4 @@ export default function RDSchemesTable({ schemes }: RDSchemesTableProps) {
       </div>
     </div>
   );
-}
+} 
