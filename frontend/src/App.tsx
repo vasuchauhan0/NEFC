@@ -52,6 +52,24 @@ export default function App() {
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
 
+  // Sync activePage with browser history
+  useEffect(() => {
+    window.history.pushState({ page: activePage }, '', window.location.pathname);
+  }, [activePage]);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const page = event.state?.page;
+      if (page) {
+        setActivePage(page);
+      } else {
+        setActivePage('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   useEffect(() => {
     const fetchRecordData = async () => {
       try {
