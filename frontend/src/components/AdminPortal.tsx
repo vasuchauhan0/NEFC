@@ -170,7 +170,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
   const handleSendAdminOtp2 = async () => {
   try {
-    const res = await fetch('/api/otp/send', { method: 'POST' });
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/send`, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
       setIsAdminOtpSent(true);
@@ -191,7 +191,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     return;
   }
   try {
-    const res = await fetch('/api/otp/verify', {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: adminOtpInput.trim() })
@@ -221,7 +221,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     return;
   }
   try {
-    const res = await fetch('/api/otp/verify', {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: adminOtpInput.trim() })
