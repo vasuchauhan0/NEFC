@@ -1396,7 +1396,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h3 className="text-base font-serif font-bold text-slate-800">Due Instalments (June 2026)</h3>
+                  <h3 className="text-base font-serif font-bold text-slate-800">Due Instalments ({new Date().toLocaleString('default', { month: 'long', year: 'numeric' })})</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Members with Recurring Deposit (RD) instalments due this month
                   </p>
@@ -1480,85 +1480,75 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           );
                         }
 
-                        return rds.map(({ member, investment }) => {
-                          const isPaid = (investment.paidMonths || []).includes('2026-06');
-                          // Simple due date extraction: get the start date day, fallback to 15th
-                          let dueDay = 15;
-                          if (investment.startDate) {
-                            const dParts = investment.startDate.split('-');
-                            if (dParts.length === 3) {
-                              const parsed = parseInt(dParts[2], 10);
-                              if (!isNaN(parsed) && parsed >= 1 && parsed <= 28) {
-                                dueDay = parsed;
-                              }
-                            }
-                          }
+                  const rows: React.ReactNode[] = [];
+        rds.forEach(({ member, investment }) => {
+          const paidMonths = investment.paidMonths || [];
+          const start = new Date(investment.startDate);
+          const now = new Date();
+          const dueDay = start.getDate();
 
-                          return (
-                            <tr key={investment.id} className="hover:bg-slate-50/50">
-                              <td className="py-4 px-4 font-mono font-bold text-slate-800 text-xs text-[#185FA5] hover:underline cursor-default">
-                                {member.id}
-                              </td>
-                              <td className="py-4 px-4 font-semibold text-slate-900">
-                                {member.name}
-                              </td>
-                              <td className="py-4 px-4">
-                                <span className="bg-slate-100 font-mono font-bold text-slate-800 px-2 py-0.5 rounded text-xs">
-                                  {investment.schemeId}
-                                </span>
-                              </td>
-                              <td className="py-4 px-4 text-slate-650 font-semibold font-mono">
-                                June {dueDay}, 2026
-                              </td>
-                              <td className="py-4 px-4 font-mono font-black text-slate-800">
-                                {formatRupee(investment.amount)}
-                              </td>
-                              <td className="py-4 px-4">
-                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${
-                                  isPaid 
-                                    ? 'bg-emerald-100 text-emerald-800' 
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {isPaid ? 'Paid & Audited' : 'Monthly Due'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                {isPaid ? (
-                                  <span className="text-xs text-emerald-700 font-bold flex items-center justify-end gap-1 select-none">
-                                    <Check size={14} className="text-emerald-600" /> Remitted
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={async () => {
-                                      // Log key paid item
-                                      const updatedMembers = safeData.members.map(m => {
-                                        if (m.id === member.id) {
-                                          const updatedInvestments = m.investments.map(inv => {
-                                            if (inv.id === investment.id) {
-                                              const paid = inv.paidMonths || [];
-                                              return {
-                                                ...inv,
-                                                paidMonths: [...paid, '2026-06']
-                                              };
-                                            }
-                                            return inv;
-                                          });
-                                          return { ...m, investments: updatedInvestments };
-                                        }
-                                        return m;
-                                      });
-                                      await handleSaveData({ ...siteData, members: updatedMembers }, `Monthly RD instalment for ${member.name} registered as Paid`);
-                                    }}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto shadow-xs"
-                                  >
-                                    <Check size={12} />
-                                    Mark paid
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
+          let d = new Date(start.getFullYear(), start.getMonth(), 1);
+          const limit = new Date(now.getFullYear(), now.getMonth(), 1);
+
+          while (d <= limit) {
+            const monthKey = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+            const isPaid = paidMonths.includes(monthKey);
+            const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            rows.push(
+              <tr key={`${investment.id}-${monthKey}`} className="hover:bg-slate-50/50">
+                <td className="py-4 px-4 font-mono font-bold text-xs text-[#185FA5]">{member.id}</td>
+                <td className="py-4 px-4 font-semibold text-slate-900">{member.name}</td>
+                <td className="py-4 px-4">
+                  <span className="bg-slate-100 font-mono font-bold text-slate-800 px-2 py-0.5 rounded text-xs">
+                    {investment.schemeId}
+                  </span>
+                </td>
+                <td className="py-4 px-4 text-slate-650 font-semibold font-mono">
+                  {monthLabel.split(' ')[0]} {dueDay}, {monthLabel.split(' ')[1]}
+                </td>
+                <td className="py-4 px-4 font-mono font-black text-slate-800">{formatRupee(investment.amount)}</td>
+                <td className="py-4 px-4">
+                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {isPaid ? 'Paid & Audited' : 'Monthly Due'}
+                  </span>
+                </td>
+                <td className="py-3 px-4 text-right">
+                  {isPaid ? (
+                    <span className="text-xs text-emerald-700 font-bold flex items-center justify-end gap-1">
+                      <Check size={14} /> Remitted
+                    </span>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        const updatedMembers = safeData.members.map(m => {
+                          if (m.id === member.id) {
+                            return {
+                              ...m,
+                              investments: m.investments.map(inv => {
+                                if (inv.id === investment.id) {
+                                  return { ...inv, paidMonths: [...(inv.paidMonths || []), monthKey] };
+                                }
+                                return inv;
+                              })
+                            };
+                          }
+                          return m;
                         });
+                        await handleSaveData({ ...siteData, members: updatedMembers }, `RD instalment ${monthLabel} for ${member.name} marked as Paid`);
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto"
+                    >
+                      <Check size={12} /> Mark paid
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+            d.setMonth(d.getMonth() + 1);
+          }
+        });
+        return rows;
                       })()}
                     </tbody>
                   </table>
