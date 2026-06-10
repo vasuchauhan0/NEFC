@@ -217,6 +217,143 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     printWindow.focus();
   };
 
+  // ── RENEWAL RECEIPT SLIP PRINTER (matches old PHP site) ───────────────────
+  const handlePrintReceipt = (inv: MemberInvestment, txn: ReturnType<typeof getRDTransactions>[number]) => {
+    const printWindow = window.open('', '_blank', 'width=750,height=550');
+    if (!printWindow) return;
+
+    // Convert amount to words (supports up to lakhs)
+    const numToWords = (n: number): string => {
+      const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+        'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+      const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+      if (n === 0) return 'Zero';
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n/10)] + (n%10 ? ' '+ones[n%10] : '');
+      if (n < 1000) return ones[Math.floor(n/100)] + ' Hundred' + (n%100 ? ' '+numToWords(n%100) : '');
+      if (n < 100000) return numToWords(Math.floor(n/1000)) + ' Thousand' + (n%1000 ? ' '+numToWords(n%1000) : '');
+      return numToWords(Math.floor(n/100000)) + ' Lakh' + (n%100000 ? ' '+numToWords(n%100000) : '');
+    };
+
+    const amountInWords = numToWords(txn.amount) + ' Rupees';
+    const address = member.city || '';
+    const memberDisplay = member.name + (address ? `, ${address}` : '');
+
+    // Calculate next installment date from txn date (add 1 month)
+    const [dd, mm, yy] = txn.date.split('/');
+    const txnDateObj = new Date(`20${yy}-${mm}-${dd}`);
+    txnDateObj.setMonth(txnDateObj.getMonth() + 1);
+    const nextDate = `${String(txnDateObj.getDate()).padStart(2,'0')}/${String(txnDateObj.getMonth()+1).padStart(2,'0')}/${String(txnDateObj.getFullYear()).slice(2)}`;
+    const nextDateFull = `${txnDateObj.getFullYear()}-${String(txnDateObj.getMonth()+1).padStart(2,'0')}-${String(txnDateObj.getDate()).padStart(2,'0')}`;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Renewal Receipt - ${inv.id}</title>
+<style>
+  @page { size: A5; margin: 12mm 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #000; background: #fff; margin: 0; padding: 0; }
+
+  .no-print { background: #1e3a8a; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .no-print span { color: #fff; font-size: 12px; font-weight: bold; }
+  .no-print button { background: #f97316; color: #fff; border: none; padding: 6px 18px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
+  @media print { .no-print { display: none !important; } }
+
+  .receipt-wrap { padding: 6px 0; }
+
+  .renewal-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 14px; letter-spacing: 1px; border-bottom: 2px solid #000; padding-bottom: 8px; }
+
+  table.info { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  table.info td { padding: 4px 6px; font-size: 13px; vertical-align: top; }
+  table.info td.label { font-weight: 600; width: 40%; }
+  table.info td.colon { width: 4%; }
+
+  .received-box { border: 1px solid #000; padding: 5px 8px; margin-bottom: 8px; font-size: 13px; }
+  .received-box .rlabel { font-weight: 600; display: inline; }
+
+  table.details { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  table.details th { border: 1px solid #000; padding: 5px 8px; font-size: 12px; font-weight: 700; text-align: center; background: #f1f5f9; }
+  table.details td { border: 1px solid #000; padding: 5px 8px; font-size: 13px; text-align: center; }
+
+  .footer-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; }
+  .footer-row .org { font-weight: 600; }
+  .footer-row .auth { text-align: right; font-size: 11px; color: #555; }
+</style>
+</head>
+<body>
+<div class="no-print">
+  <span>📄 Renewal Receipt — ${inv.id} &nbsp;|&nbsp; ${txn.monthLabel} Installment</span>
+  <button onclick="window.print()">🖨️ Print Receipt</button>
+</div>
+
+<div class="receipt-wrap">
+  <div class="renewal-title">RENEWAL RECEIPT</div>
+
+  <table class="info">
+    <tr>
+      <td class="label">Issuing Branch</td>
+      <td class="colon">:</td>
+      <td>Mohan Nagar</td>
+      <td class="label" style="text-align:right;padding-right:6px;">Member ID</td>
+      <td class="colon">:</td>
+      <td><strong>${member.id}</strong></td>
+    </tr>
+    <tr>
+      <td class="label">Account No / Certificate No</td>
+      <td class="colon">:</td>
+      <td colspan="4"><strong>${inv.id}</strong></td>
+    </tr>
+  </table>
+
+  <div class="received-box">
+    <span class="rlabel">Received From: </span>
+    ${memberDisplay}
+  </div>
+
+  <table class="info">
+    <tr>
+      <td class="label">Deposit Amount (In Words)</td>
+      <td class="colon">:</td>
+      <td colspan="4"><strong>${amountInWords}</strong></td>
+    </tr>
+  </table>
+
+  <table class="details">
+    <thead>
+      <tr>
+        <th>Deposit Date</th>
+        <th>Period</th>
+        <th>Plan</th>
+        <th>Premium No</th>
+        <th>Amount</th>
+        <th>Next Installment</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${txn.date.split('/').reverse().map((p,i)=>i===0?'20'+p:p).join('-')}</td>
+        <td>${inv.durationYears || 0} Year${(inv.durationYears||0)>1?'s':''}</td>
+        <td>${inv.schemeId}</td>
+        <td>${txn.index}-${txn.index}</td>
+        <td>₹${txn.amount.toLocaleString('en-IN')}</td>
+        <td>${nextDateFull}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer-row">
+    <div class="org">${company.name}</div>
+    <div class="auth">Authorised Signatory</div>
+  </div>
+</div>
+</body>
+</html>`);
+    printWindow.document.close();
+    printWindow.focus();
+  };
+
   // ─── PDF STATEMENT LOG GENERATOR ──────────────────────────────────────────
   const handleDownloadPDF = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -276,7 +413,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
       drawHeader();
       const isRD = inv.schemeType === 'rd';
       const txns = isRD ? getRDTransactions(inv) : [
-        { id: 'fd1', index: 1, particulars: 'Opening Deposit', date: inv.startDate || '', monthLabel: '-', amount: inv.amount || 0, balance: inv.amount || 0, lateFees: '--' }
+        { id: 'fd1', index: 1, particulars: 'Opening Deposit', date: inv.startDate || '', monthLabel: '-', amount: inv.amount || 0, balance: inv.amount || 0, lateFees: '--', type: 'CR' as const }
       ];
 
       doc.setTextColor(...PRIMARY); doc.setFont('Helvetica', 'bold'); doc.setFontSize(10);
@@ -464,7 +601,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
             if (!inv) return null;
             const isRD = inv.schemeType === 'rd';
             const txns = isRD ? getRDTransactions(inv) : [
-              { id: 'fd1', index: 1, particulars: 'Opening Deposit Principal Log', date: inv.startDate || '', monthLabel: '-', amount: inv.amount || 0, balance: inv.amount || 0, lateFees: '--' }
+              { id: 'fd1', index: 1, particulars: 'Opening Deposit Principal Log', date: inv.startDate || '', monthLabel: '-', amount: inv.amount || 0, balance: inv.amount || 0, lateFees: '--', type: 'CR' as const }
             ];
 
             return (
@@ -488,13 +625,14 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-800 text-white text-[11px] uppercase">
-                        {printMode && isRD && <th className="px-3 py-3 w-12 text-center">Print</th>}
+                        {printMode && isRD && <th className="px-3 py-3 w-12 text-center">Select</th>}
                         <th className="px-4 py-3 text-left">Date</th>
                         <th className="px-4 py-3 text-left">Particular</th>
                         <th className="px-4 py-3 text-left">Installment for the Month of</th>
                         <th className="px-4 py-3 text-center">Late Fees</th>
                         <th className="px-4 py-3 text-right">Installment</th>
                         <th className="px-4 py-3 text-right">Amount (CR)</th>
+                        {isRD && <th className="px-3 py-3 text-center">Receipt</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -530,6 +668,17 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                             <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">
                               {t.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </td>
+                            {isRD && (
+                              <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => handlePrintReceipt(inv, t)}
+                                  title="Print Renewal Receipt"
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1 mx-auto whitespace-nowrap"
+                                >
+                                  <Printer size={10} /> Receipt
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
