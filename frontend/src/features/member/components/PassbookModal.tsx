@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import {
   X, Download, Landmark, RefreshCw,
   ChevronLeft, ChevronRight, Printer,
-  Calendar, BookOpen, CheckCircle2, Settings,
+  Calendar, BookOpen, CheckCircle2, Settings, MoveDown
 } from 'lucide-react';
 import { Member, MemberInvestment } from '../../../shared/types/index.ts';
 import { formatRupee } from '../../../shared/utils/index.ts';
@@ -22,7 +22,13 @@ interface PassbookModalProps {
   };
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── interfaces ───────────────────────────────────────────────────────────────
+interface PrintConfig {
+  startTxn: number;
+  endTxn: number;
+  startLine: number;
+  printCover: boolean;
+}
 
 /** Which physical passbook page an installment number falls on */
 function getPage(n: number, rpp: number) {
@@ -36,17 +42,14 @@ function getLine(n: number, rpp: number) {
 
 export default function PassbookModal({ isOpen, onClose, member, company }: PassbookModalProps) {
   const [currentPage, setCurrentPage]   = useState(1);
-  // rows per physical passbook page — user sets this once
   const [rowsPerPage, setRowsPerPage]   = useState(8);
   const [rppInput, setRppInput]         = useState('8');
   const [showSettings, setShowSettings] = useState(false);
-  // lastPrinted[invId] = installment number last stamped in the physical book (0 = none)
-  const [lastPrinted, setLastPrinted]   = useState<Record<string, number>>({});
-  const [lpInput, setLpInput]           = useState<Record<string, string>>({});
+  
+  // Track manual print configurations for each investment
+  const [printConfigs, setPrintConfigs] = useState<Record<string, PrintConfig>>({});
 
   const activeInvestments = member.investments || [];
-  if (!isOpen) return null;
-
   const totalPages = 1 + activeInvestments.length;
 
   const totalRDPaid = activeInvestments.reduce((s, i) =>
@@ -54,6 +57,25 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
   const totalFDPaid = activeInvestments.reduce((s, i) =>
     i.schemeType === 'fd' ? s + i.amount : s, 0);
   const totalDepositValue = totalRDPaid + totalFDPaid;
+
+  // Initialize print configs when modal opens or investments change
+  useEffect(() => {
+    if (!isOpen) return;
+    const initialConfigs: Record<string, PrintConfig> = {};
+    activeInvestments.forEach(inv => {
+      const isRD = inv.schemeType === 'rd';
+      const paidCount = inv.paidMonths?.length || 0;
+      initialConfigs[inv.id] = {
+        startTxn: 1,
+        endTxn: isRD ? Math.max(1, paidCount) : 2,
+        startLine: 1,
+        printCover: true
+      };
+    });
+    setPrintConfigs(initialConfigs);
+  }, [isOpen, activeInvestments]);
+
+  if (!isOpen) return null;
 
   // ── RD transaction list ──────────────────────────────────────────────────
   const getRDTransactions = (inv: MemberInvestment) => {
@@ -69,8 +91,15 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     }));
   };
 
-  const getLP   = (id: string) => lastPrinted[id] ?? 0;
-  const getLPIn = (id: string) => lpInput[id] ?? String(lastPrinted[id] ?? 0);
+  const updateConfig = (invId: string, field: keyof PrintConfig, value: number | boolean) => {
+    setPrintConfigs(prev => ({
+      ...prev,
+      [invId]: {
+        ...prev[invId],
+        [field]: value
+      }
+    }));
+  };
 
   // ── PRINT HANDLER ──────────────────────────────────────────────────────────
   const handlePrint = () => {
@@ -84,58 +113,67 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
       const allTxns   = isRD
         ? getRDTransactions(inv)
         : [
-            { index: 1, date: inv.startDate,    particulars: 'Opening FD Principal Deposit', amount: inv.amount, balance: inv.amount, type: 'CR' },
-            { index: 2, date: inv.maturityDate,  particulars: 'Maturity Yield Value (Forecast)',
+            { index: 1, date: inv.startDate, particulars: 'Opening FD Principal Deposit', amount: inv.amount, balance: inv.amount, type: 'CR' },
+            { index: 2, date: inv.maturityDate, particulars: 'Maturity Yield Value (Forecast)',
               amount:  Math.round(inv.amount * Math.pow(1 + inv.interestPct / 100, inv.durationYears)) - inv.amount,
               balance: Math.round(inv.amount * Math.pow(1 + inv.interestPct / 100, inv.durationYears)), type: 'CR (Fcast)' },
           ];
 
-      const lp        = isRD ? getLP(inv.id) : 0;
-      const newTxns   = allTxns.slice(lp);
+      const config = printConfigs[inv.id] || { startTxn: 1, endTxn: allTxns.length, startLine: 1 };
+      
+      // Slice based on manual start/end transaction configuration
+      const startIdx = Math.max(0, config.startTxn - 1);
+      const endIdx = Math.min(allTxns.length, config.endTxn);
+      const newTxns = allTxns.slice(startIdx, endIdx);
+      
       const paidCount = inv.paidMonths?.length || 0;
       const totalInst = inv.durationYears * 12;
 
-      // ── multi-page layout for RD ─────────────────────────────────────────
-      // Group new transactions by which physical passbook page they land on
+      // ── multi-page layout based on MANUAL Start Line ─────────────────────
       let pageGroups: { pageNo: number; spacers: number; rows: typeof newTxns }[] = [];
 
       if (isRD && newTxns.length > 0) {
+        let currentPhysicalLine = config.startLine;
+        let currentSheetNum = 1;
         let currentGroup: typeof pageGroups[0] | null = null;
+
         newTxns.forEach((t) => {
-          const pg = getPage(t.index, rpp);
-          const ln = getLine(t.index, rpp);
-          if (!currentGroup || currentGroup.pageNo !== pg) {
-            // spacers = how many lines are already used on this page before our first new entry
-            const firstLineOnPage  = (pg - 1) * rpp + 1;
-            const spacersNeeded    = t.index - firstLineOnPage; // entries already printed on this page
-            currentGroup = { pageNo: pg, spacers: Math.max(0, spacersNeeded), rows: [] };
+          // If we exceed rows per page, move to the next physical sheet
+          if (!currentGroup || currentPhysicalLine > rpp) {
+            if (currentPhysicalLine > rpp) {
+              currentPhysicalLine = 1; 
+              currentSheetNum++;
+            }
+            // Spacers are determined by the physical line we want to start on minus 1
+            currentGroup = { pageNo: currentSheetNum, spacers: currentPhysicalLine - 1, rows: [] };
             pageGroups.push(currentGroup);
           }
           currentGroup.rows.push(t);
+          currentPhysicalLine++;
         });
       } else {
-        // FD: single group, no spacers
-        pageGroups = [{ pageNo: 1, spacers: 0, rows: newTxns }];
+        // FD: single group, spacers based on config
+        pageGroups = [{ pageNo: 1, spacers: config.startLine - 1, rows: newTxns }];
       }
 
-      const continuedNotice = isRD && lp > 0
+      const continuedNotice = isRD && config.startTxn > 1
         ? `<div class="continued-notice">
             <span class="cn-badge">CONTINUED</span>
-            Last printed: Installment <strong>#${lp}</strong> on <strong>${allTxns[lp - 1]?.date || '—'}</strong>
-            &nbsp;|&nbsp; Carried forward balance: <strong>₹${(inv.amount * lp).toLocaleString('en-IN')}</strong>
-            &nbsp;|&nbsp; Printing from installment <strong>#${lp + 1}</strong>
+            Printing from Installment <strong>#${config.startTxn}</strong>
+            &nbsp;|&nbsp; Carried forward balance: <strong>₹${(inv.amount * (config.startTxn - 1)).toLocaleString('en-IN')}</strong>
           </div>`
         : '';
 
       return pageGroups.map((grp, grpIdx) => {
+        // Inject blank spacer rows to push the text down to the desired line
         const spacerRows = Array(grp.spacers).fill(null).map((_, si) => `
           <tr class="spacer-row">
-            <td class="center mono">${(getPage(lp, rpp) === grp.pageNo ? lp - grp.spacers + si + 1 : si + 1)}</td>
-            <td colspan="5" class="faint" style="font-style:italic;font-size:8.5px;">— already printed —</td>
+            <td class="center mono">${si + 1}</td>
+            <td colspan="5" class="faint" style="font-style:italic;font-size:8.5px;">— intentionally left blank —</td>
           </tr>`).join('');
 
         const dataRows = grp.rows.map((t, ri) => `
-          <tr class="${ri % 2 === 0 ? 'row-even' : 'row-odd'}${grpIdx === 0 && ri === 0 && lp > 0 ? ' first-new' : ''}">
+          <tr class="${ri % 2 === 0 ? 'row-even' : 'row-odd'}">
             <td class="center mono">${t.index}</td>
             <td class="mono">${t.date}</td>
             <td class="bold">${t.particulars}</td>
@@ -192,8 +230,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
           </div>`}
 
           <div class="ledger-title">
-            ENTRIES${isRD ? ` — INSTALLMENTS #${grp.rows[0].index} TO #${grp.rows[grp.rows.length - 1].index}` : ''}
-            ${isRD ? `&nbsp;|&nbsp; PASSBOOK PAGE ${grp.pageNo} &nbsp;|&nbsp; LINES ${getLine(grp.rows[0].index, rpp)}–${getLine(grp.rows[grp.rows.length-1].index, rpp)}` : ''}
+            ENTRIES${newTxns.length > 0 ? ` — INSTALLMENTS #${grp.rows[0].index} TO #${grp.rows[grp.rows.length - 1].index}` : ''}
           </div>
 
           <table class="ledger-table">
@@ -420,7 +457,7 @@ ${investmentPages.join('\n')}
     activeInvestments.forEach((inv, pi) => {
       doc.addPage(); hdr();
       const isRD = inv.schemeType === 'rd';
-      const lp   = isRD ? getLP(inv.id) : 0;
+      
       const all  = isRD ? getRDTransactions(inv)
         : [
             { index:1, date:inv.startDate,   particulars:'Opening FD Principal Deposit', amount:inv.amount, balance:inv.amount, type:'CR' },
@@ -428,18 +465,23 @@ ${investmentPages.join('\n')}
               amount: Math.round(inv.amount*Math.pow(1+inv.interestPct/100,inv.durationYears))-inv.amount,
               balance:Math.round(inv.amount*Math.pow(1+inv.interestPct/100,inv.durationYears)), type:'CR (Fcast)' },
           ];
-      const rows = all.slice(lp);
+          
+      // Respect the manual print config for the PDF export as well
+      const config = printConfigs[inv.id] || { startTxn: 1, endTxn: all.length, startLine: 1 };
+      const startIdx = Math.max(0, config.startTxn - 1);
+      const endIdx = Math.min(all.length, config.endTxn);
+      const rows = all.slice(startIdx, endIdx);
 
       doc.setTextColor(...PC); doc.setFont('Helvetica','bold'); doc.setFontSize(11);
       doc.text(`${isRD?'RD':'FD'} LEDGER — ${inv.id}`,15,32);
 
-      if (isRD && lp > 0) {
+      if (isRD && config.startTxn > 1) {
         doc.setFillColor(255,251,235); doc.rect(15,36,180,8,'F');
         doc.setTextColor(120,53,15); doc.setFont('Helvetica','bold'); doc.setFontSize(8);
-        doc.text(`CONTINUED — Last printed: #${lp} | Carried forward: ₹${(inv.amount*lp).toLocaleString('en-IN')} | Printing from #${lp+1}`,18,41);
+        doc.text(`CONTINUED — Printing from #${config.startTxn} | Carried forward: ₹${(inv.amount*(config.startTxn - 1)).toLocaleString('en-IN')}`,18,41);
       }
 
-      const ty = isRD && lp > 0 ? 50 : 40;
+      const ty = isRD && config.startTxn > 1 ? 50 : 40;
       doc.setFillColor(...PC); doc.rect(15,ty,180,7,'F');
       doc.setTextColor(255,255,255); doc.setFont('Helvetica','bold'); doc.setFontSize(8);
       ['No.','Date','Particulars','Type','Amount','Balance'].forEach((h,i)=>{
@@ -449,7 +491,7 @@ ${investmentPages.join('\n')}
       let y = ty+7;
       rows.forEach((r,ri) => {
         if (ri%2===1){doc.setFillColor(248,250,252); doc.rect(15,y,180,7,'F');}
-        if (isRD && ri===0 && lp>0){doc.setFillColor(240,253,244); doc.rect(15,y,180,7,'F');}
+        if (isRD && ri===0 && config.startTxn > 1){doc.setFillColor(240,253,244); doc.rect(15,y,180,7,'F');}
         doc.setDrawColor(...GL); doc.line(15,y+7,195,y+7);
         doc.setTextColor(...TM); doc.setFont('Helvetica','normal'); doc.setFontSize(8);
         doc.text(String(r.index),20,y+5);
@@ -459,10 +501,10 @@ ${investmentPages.join('\n')}
         doc.text(r.amount.toLocaleString('en-IN'),152,y+5);
         doc.setFont('Helvetica','bold');
         if (r.type.includes('Fcast')) {
-  doc.setTextColor(...PC);
-} else {
-  doc.setTextColor(16, 124, 65);
-}
+          doc.setTextColor(...PC);
+        } else {
+          doc.setTextColor(16, 124, 65);
+        }
         doc.text(r.balance.toLocaleString('en-IN'),176,y+5);
         y+=7;
       });
@@ -474,16 +516,12 @@ ${investmentPages.join('\n')}
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   const currentInv   = currentPage >= 2 ? activeInvestments[currentPage - 2] : null;
-  const isCurrentRD  = currentInv?.schemeType === 'rd';
   const paidCount    = currentInv?.paidMonths?.length || 0;
-  const lp           = currentInv ? getLP(currentInv.id) : 0;
-  const newCount     = paidCount - lp;
-
-  // page position info
-  const firstNewInstall = lp + 1;
-  const firstNewPg   = paidCount > lp ? getPage(firstNewInstall, rowsPerPage) : null;
-  const firstNewLn   = paidCount > lp ? getLine(firstNewInstall, rowsPerPage) : null;
-  const lastNewPg    = paidCount > 0  ? getPage(paidCount, rowsPerPage) : null;
+  
+  // Safe config access for current page
+  const curConfig = currentInv && printConfigs[currentInv.id] 
+    ? printConfigs[currentInv.id] 
+    : { startTxn: 1, endTxn: 1, startLine: 1, printCover: true };
 
   return (
     <div className="fixed inset-0 z-[60000] bg-slate-900/85 backdrop-blur-sm flex flex-col justify-center items-center p-2 sm:p-4 text-slate-800">
@@ -495,7 +533,7 @@ ${investmentPages.join('\n')}
             <div className="bg-blue-600 p-1.5 rounded-lg"><BookOpen size={18} /></div>
             <div>
               <h3 className="text-xs sm:text-sm font-bold text-slate-100 leading-none">{member.name}'s Passbook</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5 leading-none">Digital Ledger Preview</p>
+              <p className="text-[10px] text-slate-400 mt-0.5 leading-none">Manual Line Alignment Mode</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -508,7 +546,7 @@ ${investmentPages.join('\n')}
               <span className="hidden sm:inline">Settings</span>
             </button>
             <button onClick={handlePrint} className="p-1.5 sm:p-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold">
-              <Printer size={14} /><span className="hidden sm:inline">Print</span>
+              <Printer size={14} /><span className="hidden sm:inline">Print to Passbook</span>
             </button>
             <button onClick={handleDownloadPDF} className="p-1.5 sm:p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1 font-bold">
               <Download size={14} /><span className="hidden sm:inline">PDF</span>
@@ -522,11 +560,7 @@ ${investmentPages.join('\n')}
         {showSettings && (
           <div className="bg-amber-950/80 border-b border-amber-800/50 px-4 py-3 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <Settings size={13} className="text-amber-300" />
-              <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wide">Passbook Settings</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-amber-300 font-medium">Rows per physical page:</span>
+              <span className="text-xs text-amber-300 font-medium">Physical book rows per page:</span>
               <input
                 type="number"
                 min={1} max={30}
@@ -538,62 +572,54 @@ ${investmentPages.join('\n')}
                 }}
                 className="w-16 text-center bg-amber-900 border border-amber-700 text-amber-100 text-sm font-mono rounded-lg px-2 py-1"
               />
-              <span className="text-[11px] text-amber-400">Count the lines in your physical passbook book</span>
             </div>
           </div>
         )}
 
-        {/* ── RD print-range control ── */}
-        {isCurrentRD && currentInv && (
-          <div className="bg-slate-800/90 border-b border-slate-700 px-4 py-2.5 flex flex-wrap items-center gap-4">
+        {/* ── RD MANUAL print-range control ── */}
+        {currentInv && (
+          <div className="bg-slate-800/90 border-b border-slate-700 px-4 py-3 flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-1.5 text-slate-300">
-              <Printer size={13} />
-              <span className="text-[11px] font-bold uppercase tracking-wide">Print Range</span>
+              <MoveDown size={14} className="text-emerald-400" />
+              <span className="text-[11px] font-bold uppercase tracking-wide">Manual Alignment</span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-300">
-              <span className="text-slate-400">Last already-printed installment:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">Print Transactions:</span>
               <input
-                type="number"
-                min={0}
-                max={paidCount}
-                value={getLPIn(currentInv.id)}
-                onChange={e => {
-                  const raw = e.target.value;
-                  setLpInput(prev => ({ ...prev, [currentInv.id]: raw }));
-                  const n = parseInt(raw);
-                  if (!isNaN(n) && n >= 0 && n <= paidCount) {
-                    setLastPrinted(prev => ({ ...prev, [currentInv.id]: n }));
-                  }
-                }}
-                className="w-20 text-center bg-slate-700 border border-slate-600 text-slate-100 text-sm font-mono rounded-lg px-2 py-1"
+                type="number" min={1} max={paidCount || 2}
+                value={curConfig.startTxn}
+                onChange={e => updateConfig(currentInv.id, 'startTxn', parseInt(e.target.value) || 1)}
+                className="w-14 text-center bg-slate-900 border border-slate-600 text-slate-100 text-sm font-mono rounded-lg px-1 py-1"
               />
-              <span className="text-slate-500 text-[11px]">(0 = none printed yet, max {paidCount})</span>
+              <span className="text-xs text-slate-400">to</span>
+              <input
+                type="number" min={1} max={paidCount || 2}
+                value={curConfig.endTxn}
+                onChange={e => updateConfig(currentInv.id, 'endTxn', parseInt(e.target.value) || 1)}
+                className="w-14 text-center bg-slate-900 border border-slate-600 text-slate-100 text-sm font-mono rounded-lg px-1 py-1"
+              />
             </div>
 
-            {newCount > 0 && firstNewPg !== null && (
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
-                <CheckCircle2 size={12} />
-                Print #{lp + 1}–#{paidCount} &nbsp;·&nbsp;
-                Starts on passbook page <strong>{firstNewPg}</strong>, line <strong>{firstNewLn}</strong>
-                {firstNewPg !== lastNewPg && <> → ends page <strong>{lastNewPg}</strong></>}
-                &nbsp;·&nbsp; {newCount} new {newCount === 1 ? 'entry' : 'entries'}
-              </div>
-            )}
-            {newCount === 0 && lp > 0 && (
-              <span className="text-[11px] text-slate-500">Nothing new to print — all installments already printed</span>
-            )}
-            {lp === 0 && (
-              <span className="text-[11px] text-slate-400">Will print all {paidCount} installments</span>
-            )}
+            <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-lg border border-slate-700">
+              <span className="text-xs text-amber-400 font-semibold">Start on Physical Line:</span>
+              <input
+                type="number" min={1} max={rowsPerPage}
+                value={curConfig.startLine}
+                onChange={e => updateConfig(currentInv.id, 'startLine', parseInt(e.target.value) || 1)}
+                className="w-14 text-center bg-slate-900 border border-amber-600/50 text-amber-100 text-sm font-mono rounded-lg px-1 py-1"
+                title="Enter the exact line number where the printer head should start"
+              />
+              <span className="text-[10px] text-slate-500">(1 to {rowsPerPage})</span>
+            </div>
           </div>
         )}
 
         {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto bg-slate-700/65 flex flex-col justify-start items-center p-3 sm:p-6 space-y-4 scrollbar-thin">
           <div className="w-full max-w-[210mm] min-h-[297mm] bg-white text-slate-900 shadow-xl rounded-2xl p-6 sm:p-10 relative flex flex-col justify-between border border-slate-200 select-none">
+            
             <div className="relative">
-
               {/* letterhead */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-slate-900 pb-3 gap-2 mb-6">
                 <div>
@@ -673,120 +699,78 @@ ${investmentPages.join('\n')}
                 </div>
               )}
 
-              {/* ── INVESTMENT PAGE ── */}
-              {currentPage >= 2 && (() => {
-                const inv = activeInvestments[currentPage - 2];
-                if (!inv) return null;
-                const isRD   = inv.schemeType === 'rd';
-                const invLP  = isRD ? getLP(inv.id) : 0;
-                const pc     = inv.paidMonths?.length || 0;
-                const allT   = isRD ? getRDTransactions(inv) : [
-                  { index:1, date:inv.startDate,   particulars:'Opening FD Principal Deposit', amount:inv.amount, balance:inv.amount, type:'CR' },
-                  { index:2, date:inv.maturityDate, particulars:'Maturity Yield Value (Forecast)',
-                    amount: Math.round(inv.amount*Math.pow(1+inv.interestPct/100,inv.durationYears))-inv.amount,
-                    balance:Math.round(inv.amount*Math.pow(1+inv.interestPct/100,inv.durationYears)), type:'CR (Fcast)' },
+              {/* ── INVESTMENT PAGE PREVIEW ── */}
+              {currentPage >= 2 && currentInv && (() => {
+                const isRD = currentInv.schemeType === 'rd';
+                const allT = isRD ? getRDTransactions(currentInv) : [
+                  { index:1, date:currentInv.startDate, particulars:'Opening Deposit', amount:currentInv.amount, balance:currentInv.amount, type:'CR' }
                 ];
-                const dispT = allT.slice(invLP);
+                
+                // Show only the transactions the user selected in the UI preview
+                const startIdx = Math.max(0, curConfig.startTxn - 1);
+                const endIdx = Math.min(allT.length, curConfig.endTxn);
+                const dispT = allT.slice(startIdx, endIdx);
+
+                // Build preview rows with manual spacers
+                const previewRows = [];
+                for (let i = 1; i < curConfig.startLine; i++) {
+                   previewRows.push(
+                     <tr key={`spacer-${i}`} className="bg-slate-50">
+                       <td className="px-3 py-2 text-center text-slate-300 font-mono text-[10px]">Line {i}</td>
+                       <td colSpan={5} className="px-3 py-2 text-slate-400 italic text-[10px] text-center">-- Blank (Printer will skip this line) --</td>
+                     </tr>
+                   );
+                }
+                dispT.forEach((t, i) => {
+                   previewRows.push(
+                     <tr key={t.index} className="border-b border-slate-100 bg-emerald-50/30">
+                       <td className="px-3 py-2 text-center font-bold text-slate-600 font-mono text-[10px]">Line {curConfig.startLine + i}</td>
+                       <td className="px-3 py-2 text-slate-700 font-mono text-xs">{t.date}</td>
+                       <td className="px-3 py-2 font-bold text-slate-800 text-xs">Txn #{t.index} - {t.particulars}</td>
+                       <td className="px-3 py-2 text-center text-xs"><span className="text-slate-600 bg-slate-200 font-bold px-1 py-0.5 rounded font-mono text-[10px]">{t.type}</span></td>
+                       <td className="px-3 py-2 text-right font-mono text-slate-700 text-xs">{formatRupee(t.amount)}</td>
+                       <td className="px-3 py-2 text-right font-mono font-black text-emerald-800 text-xs">{formatRupee(t.balance)}</td>
+                     </tr>
+                   );
+                });
 
                 return (
-                  <div key={inv.id}>
+                  <div key={currentInv.id}>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4 gap-2">
                       <div>
                         <div className="flex items-center gap-1.5">
                           {isRD ? <RefreshCw className="text-emerald-700" size={15}/> : <Landmark className="text-blue-700" size={15}/>}
-                          <span className="font-bold text-sm">{isRD ? 'Recurring Deposit' : 'Fixed Deposit'} · {inv.id}</span>
+                          <span className="font-bold text-sm">{isRD ? 'Recurring Deposit' : 'Fixed Deposit'} · {currentInv.id}</span>
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{inv.schemeId} · {inv.interestPct.toFixed(1)}% p.a. · {inv.durationYears}yr</div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{currentInv.schemeId} · {currentInv.interestPct.toFixed(1)}% p.a. · {currentInv.durationYears}yr</div>
                       </div>
                       <div className="text-left sm:text-right">
                         <span className="text-[10px] text-slate-400 block font-bold">TERM</span>
-                        <span className="text-[11px] font-bold text-slate-700 font-mono">{inv.startDate} → {inv.maturityDate}</span>
+                        <span className="text-[11px] font-bold text-slate-700 font-mono">{currentInv.startDate} → {currentInv.maturityDate}</span>
                       </div>
                     </div>
 
-                    {/* position info badge */}
-                    {isRD && invLP > 0 && (
-                      <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                        <span className="bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded font-mono mr-2">CONTINUED</span>
-                        Last printed: <strong>#{invLP}</strong> on <strong>{allT[invLP-1]?.date}</strong>
-                        &nbsp;·&nbsp; Carried forward: <strong>{formatRupee(inv.amount * invLP)}</strong>
-                        &nbsp;·&nbsp; New entries start at passbook page <strong>{getPage(invLP+1, rowsPerPage)}</strong>, line <strong>{getLine(invLP+1, rowsPerPage)}</strong>
-                      </div>
-                    )}
+                    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex flex-col gap-1">
+                      <div><strong>Print Preview Rule:</strong> The printer will feed paper and leave <strong>{curConfig.startLine - 1} blank lines</strong>.</div>
+                      <div>It will begin printing transaction <strong>#{curConfig.startTxn}</strong> directly on physical <strong>Line {curConfig.startLine}</strong>.</div>
+                    </div>
 
-                    {isRD && (
-                      <div className="mb-3 flex flex-wrap gap-3 text-[10px] text-slate-500">
-                        <span className="bg-slate-100 px-2 py-1 rounded font-mono">Rows/page: {rowsPerPage}</span>
-                        {dispT.length > 0 && (
-                          <>
-                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-mono">
-                              First new: page {getPage(dispT[0].index, rowsPerPage)}, line {getLine(dispT[0].index, rowsPerPage)}
-                            </span>
-                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-mono">
-                              Last new: page {getPage(dispT[dispT.length-1].index, rowsPerPage)}, line {getLine(dispT[dispT.length-1].index, rowsPerPage)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                      {isRD && invLP > 0 ? `New Entries — #${invLP+1} to #${pc}` : 'Ledger Entries'}
-                    </h3>
-
-                    <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-xs text-left">
                         <thead>
                           <tr className="bg-slate-900 text-white text-[9.5px] uppercase">
-                            <th className="px-3 py-2 text-center w-10">No.</th>
-                            <th className="px-3 py-2 w-28">Date</th>
+                            <th className="px-3 py-2 text-center w-16">Phys. Line</th>
+                            <th className="px-3 py-2 w-24">Date</th>
                             <th className="px-3 py-2">Particulars</th>
                             <th className="px-3 py-2 text-center w-14">Type</th>
                             <th className="px-3 py-2 text-right w-24">Amount</th>
                             <th className="px-3 py-2 text-right w-28">Balance</th>
-                            {isRD && <th className="px-3 py-2 text-center w-28 text-[9px] text-slate-400">Pg / Line</th>}
                           </tr>
                         </thead>
                         <tbody>
-                          {dispT.map((t, i) => {
-                            const pg = isRD ? getPage(t.index, rowsPerPage) : null;
-                            const ln = isRD ? getLine(t.index, rowsPerPage) : null;
-                            const isFirst = i === 0 && invLP > 0;
-                            const pageChange = isRD && i > 0 && getPage(dispT[i-1].index, rowsPerPage) !== pg;
-                            return (
-                              <React.Fragment key={t.index}>
-                                {pageChange && (
-                                  <tr>
-                                    <td colSpan={isRD ? 7 : 6} className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold text-center border-y border-blue-200">
-                                      ↓ Passbook page {pg} — insert next physical sheet
-                                    </td>
-                                  </tr>
-                                )}
-                                <tr className={`border-b border-slate-100 ${isFirst ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : i%2===1 ? 'bg-slate-50/40' : ''}`}>
-                                  <td className="px-3 py-2 text-center font-bold text-slate-400 font-mono">{t.index}</td>
-                                  <td className="px-3 py-2 text-slate-500 font-mono">{t.date}</td>
-                                  <td className="px-3 py-2 font-bold text-slate-800">{t.particulars}</td>
-                                  <td className="px-3 py-2 text-center"><span className="text-slate-500 bg-slate-100 font-bold px-1 py-0.5 rounded font-mono text-[10px]">{t.type}</span></td>
-                                  <td className="px-3 py-2 text-right font-mono text-slate-700">{formatRupee(t.amount)}</td>
-                                  <td className={`px-3 py-2 text-right font-mono font-black ${t.type.includes('Fcast') ? 'text-blue-900' : 'text-emerald-800'}`}>{formatRupee(t.balance)}</td>
-                                  {isRD && <td className="px-3 py-2 text-center font-mono text-[10px] text-blue-600">pg {pg} / ln {ln}</td>}
-                                </tr>
-                              </React.Fragment>
-                            );
-                          })}
+                          {previewRows}
                         </tbody>
                       </table>
-                    </div>
-
-                    <div className="mt-5 border-t border-slate-200 pt-4 flex flex-col sm:flex-row justify-between text-xs text-slate-500 gap-3">
-                      <div>
-                        {isRD
-                          ? <span>Paid <strong>{pc}</strong> of <strong>{inv.durationYears*12}</strong> installments{invLP > 0 ? ` · ${pc-invLP} new to print` : ''}</span>
-                          : <span>Principal locked for {inv.durationYears} year(s)</span>}
-                      </div>
-                      <div className="text-left sm:text-right font-bold">
-                        Total: <span className="font-mono text-emerald-800 text-sm font-black">{formatRupee(isRD ? inv.amount*pc : inv.amount)}</span>
-                      </div>
                     </div>
                   </div>
                 );
