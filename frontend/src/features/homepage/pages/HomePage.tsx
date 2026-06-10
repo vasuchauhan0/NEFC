@@ -28,7 +28,7 @@ export default function HomePage({ hero, stats, steps, trust, navigate }: HomePa
               Secure your future with our trusted Fixed and Recurring Deposit plans.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
             <div className="rounded-2xl overflow-hidden shadow-md border border-slate-200">
               <img src="/fd.jpg" alt="Fixed Deposit" className="w-full h-56 object-cover" />
               <div className="p-6">
@@ -44,6 +44,15 @@ export default function HomePage({ hero, stats, steps, trust, navigate }: HomePa
                 <h3 className="font-serif text-xl font-bold text-slate-900 mb-2">Recurring Deposit</h3>
                 <p className="text-slate-600 text-sm leading-relaxed">
                   Deposit periodically and build your savings over time. Flexible tenures with attractive maturity returns.
+                </p>
+              </div>
+            </div>
+            <div className="rounded-2xl overflow-hidden shadow-md border border-slate-200">
+              <img src="/loan.jpeg" alt="Loan Against Deposit" className="w-full h-56 object-cover" />
+              <div className="p-6">
+                <h3 className="font-serif text-xl font-bold text-slate-900 mb-2">Loan Against Deposit</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Get instant loan against your FD or RD without breaking your deposit. Quick approval with minimal documentation.
                 </p>
               </div>
             </div>
