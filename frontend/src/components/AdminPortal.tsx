@@ -20,7 +20,8 @@ import {
   ShieldAlert, 
   Sparkles, 
   PlusCircle, 
-  Check, 
+  Check,
+  Printer, 
   X, 
   Phone, 
   Mail, 
@@ -1521,27 +1522,57 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     </span>
                   ) : (
                     <button
-                      onClick={async () => {
-                        const updatedMembers = safeData.members.map(m => {
-                          if (m.id === member.id) {
-                            return {
-                              ...m,
-                              investments: m.investments.map(inv => {
-                                if (inv.id === investment.id) {
-                                  return { ...inv, paidMonths: [...(inv.paidMonths || []), monthKey] };
-                                }
-                                return inv;
-                              })
-                            };
-                          }
-                          return m;
-                        });
-                        await handleSaveData({ ...siteData, members: updatedMembers }, `RD instalment ${monthLabel} for ${member.name} marked as Paid`);
-                      }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto"
-                    >
-                      <Check size={12} /> Mark paid
-                    </button>
+  onClick={() => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const installNum = (investment.paidMonths?.length || 0) + 1;
+    const totalAmount = installNum * investment.amount;
+    printWindow.document.write(`
+      <html><head><title>Passbook Entry</title>
+      <style>
+        @page { size: 210mm 95mm; margin: 5mm; }
+        body { font-family: Arial, sans-serif; font-size: 11px; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
+        .header h2 { font-size: 13px; margin: 0; }
+        .header p { font-size: 9px; margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        th { background: #000; color: #fff; padding: 4px 6px; text-align: left; }
+        td { padding: 4px 6px; border-bottom: 1px solid #ccc; }
+        .footer { margin-top: 6px; font-size: 9px; text-align: right; }
+      </style></head>
+      <body>
+        <div class="header">
+          <h2>NATION EMPOWER CO-OPERATIVE SOCIETY</h2>
+          <p>4th Floor, Plot No F-32, Crown Plaza Mohan Nagar, Ghaziabad, Uttar Pradesh - 201007</p>
+        </div>
+        <p><b>Member:</b> ${member.name} &nbsp;&nbsp; <b>ID:</b> ${member.id} &nbsp;&nbsp; <b>Scheme:</b> ${investment.schemeId}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Particular</th><th>Month of</th><th>Late Fees</th><th>Installment</th><th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${new Date().toISOString().split('T')[0]}</td>
+              <td>${installNum}-${installNum}</td>
+              <td>${new Date(monthKey + '-01').toLocaleString('default', { month: 'long' })}</td>
+              <td>--</td>
+              <td>${investment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td>${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="footer">Authorized Signatory: _______________</div>
+        <script>window.onload = function() { window.print(); window.close(); }</script>
+      </body></html>
+    `);
+    printWindow.document.close();
+  }}
+  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto mt-1"
+>
+  <Printer size={12} /> Print Entry
+</button>
                   )}
                 </td>
               </tr>
