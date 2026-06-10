@@ -191,6 +191,10 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
 
   const isRDSelected = activeInv.schemeType === 'rd';
 
+  // Helper: Address and Nominee dynamic calculations
+ 
+
+
   // Helper: Get transaction list for RD
   const getRDTransactions = (inv: MemberInvestment) => {
     const paidMonths = [...(inv.paidMonths || [])].sort();
@@ -354,7 +358,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     doc.text('Nominee Name:', 20, 118);
     doc.setFont('Helvetica', 'normal');
 
-
     doc.setFont('Helvetica', 'bold');
     doc.text('Member Since:', 110, 118);
     doc.setFont('Helvetica', 'normal');
@@ -363,6 +366,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     doc.setFont('Helvetica', 'bold');
     doc.text('Address:', 20, 128);
     doc.setFont('Helvetica', 'normal');
+  
 
     doc.setFont('Helvetica', 'bold');
     doc.text('Account Status:', 110, 146);
@@ -761,9 +765,11 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               </tr>
               <tr>
                 <td style="font-weight: 600; background-color: #f7f9fa;">Address</td>
+              
               </tr>
               <tr>
                 <td style="font-weight: 600; background-color: #f7f9fa;">Nominee Name</td>
+            
               </tr>
               <tr>
                 <td style="font-weight: 600; background-color: #f7f9fa;">Plan</td>
@@ -997,6 +1003,357 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     }
   };
 
+  // PRINT DETAILS ONLY (COVER PAGE)
+  const handlePrintDetailsOnly = () => {
+    const printFrame = document.createElement('iframe');
+    printFrame.name = 'nefc_print_details_iframe';
+    printFrame.style.position = 'absolute';
+    printFrame.style.top = '-9999px';
+    printFrame.style.left = '-9999px';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>NEFC Details Printer - ${member.name}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                margin: 20mm 15mm;
+                padding: 0;
+                background-color: white !important;
+                color: black !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              
+              .details-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+                font-family: Arial, sans-serif;
+              }
+              .details-table td {
+                padding: 8px 10px;
+                vertical-align: top;
+              }
+              .lbl {
+                font-weight: bold;
+                width: 25%;
+                white-space: nowrap;
+              }
+              .val {
+                width: 25%;
+              }
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+            </style>
+          </head>
+          <body>
+            <table class="details-table">
+              <tr>
+                <td class="lbl">Member Id</td>
+                <td class="val">: ${member.id}</td>
+                <td class="lbl">Policy No</td>
+                <td class="val">: ${activeInv.id}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Member Name</td>
+                <td class="val">: ${member.name}</td>
+                <td class="lbl">Policy Opening Date</td>
+                <td class="val">: ${activeInv.startDate}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Address</td>
+             
+              </tr>
+              <tr>
+                <td class="lbl">Nominee Name</td>
+                
+              </tr>
+              <tr>
+                <td class="lbl">Plan</td>
+                <td class="val">: ${activeInv.schemeId}</td>
+                <td class="lbl">Period</td>
+                <td class="val">: ${activeInv.durationYears * 12} Months</td>
+              </tr>
+              <tr>
+                <td class="lbl">Policy Amount(INR)</td>
+                <td class="val">: ${formatAmountRaw(activeInv.amount)}</td>
+                <td class="lbl">Total Payable Amount(INR)</td>
+                <td class="val">: ${formatAmountRaw(isRDSelected ? activeInv.amount * activeInv.durationYears * 12 : activeInv.amount)}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Maturity Date</td>
+                <td class="val">: ${activeInv.maturityDate}</td>
+                <td class="lbl">Maturity Amount(INR)</td>
+                <td class="val">: ${formatAmountRaw(getMaturityAmount(activeInv))}</td>
+              </tr>
+            </table>
+          </body>
+        </html>
+      `);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.focus();
+          printFrame.contentWindow?.print();
+        } catch (printErr) {
+          console.error('Frame details printed invocation failure: ', printErr);
+        }
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1500);
+      }, 500);
+    }
+  };
+
+  // PRINT LEDGER PAGE ONLY (6 INSTALLMENTS)
+  const handlePrintLedgerPageOnly = () => {
+    // Current visible page's chunk contains 6 items (activeChunk).
+    const printableChunk = activeChunk.filter(t => !excludedRowIndices[t.index]);
+
+    if (printableChunk.length === 0) {
+      alert("No active ledger rows are checked for printing. Please enable at least one line.");
+      return;
+    }
+
+    // Replace excluded rows with empty rows to preserve physical line heights in passbook alignment
+    const paddedChunk = activeChunk.map((t) => {
+      const isExcluded = excludedRowIndices[t.index] === true;
+      if (isExcluded) {
+        return {
+          date: '',
+          particulars: '',
+          month: '',
+          lateFees: '',
+          amount: 0,
+          balance: 0,
+          isEmpty: true
+        };
+      }
+      return t;
+    });
+
+    const printFrame = document.createElement('iframe');
+    printFrame.name = 'nefc_print_ledger_page_iframe';
+    printFrame.style.position = 'absolute';
+    printFrame.style.top = '-9999px';
+    printFrame.style.left = '-9999px';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>NEFC Ledger Printer - Page ${currentPage}</title>
+            <style>
+              body {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 13px;
+                font-weight: bold;
+                margin: 20mm 15mm;
+                padding: 0;
+                background-color: white !important;
+                color: black !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .ledger-table {
+                width: 100%;
+                border-collapse: collapse;
+                border: none;
+              }
+              .ledger-table td {
+                padding: 8px 0;
+                border: none;
+              }
+              .col-date {
+                width: 18%;
+                text-align: left;
+              }
+              .col-part {
+                width: 14%;
+                text-align: center;
+              }
+              .col-month {
+                width: 25%;
+                text-align: center;
+              }
+              .col-fees {
+                width: 11%;
+                text-align: center;
+              }
+              .col-inst {
+                width: 16%;
+                text-align: right;
+              }
+              .col-bal {
+                width: 16%;
+                text-align: right;
+              }
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+            </style>
+          </head>
+          <body>
+            <table class="ledger-table">
+              <tbody>
+                ${paddedChunk.map((t) => {
+                  const isPadded = (t as any).isEmpty;
+                  return `
+                    <tr>
+                      <td class="col-date">${isPadded ? '&nbsp;' : t.date}</td>
+                      <td class="col-part">${isPadded ? '&nbsp;' : t.particulars}</td>
+                      <td class="col-month">${isPadded ? '&nbsp;' : t.month}</td>
+                      <td class="col-fees">${isPadded ? '&nbsp;' : t.lateFees}</td>
+                      <td class="col-inst">${isPadded ? '&nbsp;' : formatAmountRaw(t.amount)}</td>
+                      <td class="col-bal">${isPadded ? '&nbsp;' : formatAmountRaw(t.balance || t.amount)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.focus();
+          printFrame.contentWindow?.print();
+        } catch (printErr) {
+          console.error('Frame ledger page print failure: ', printErr);
+        }
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1500);
+      }, 500);
+    }
+  };
+
+  // PRINT SINGLE ROW LEDGER LINE
+  const handlePrintSingleRow = (row: any) => {
+    const printFrame = document.createElement('iframe');
+    printFrame.name = 'nefc_print_row_iframe';
+    printFrame.style.position = 'absolute';
+    printFrame.style.top = '-9999px';
+    printFrame.style.left = '-9999px';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>NEFC Row Printer - Row ${row.index}</title>
+            <style>
+              body {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 13px;
+                font-weight: bold;
+                margin: 20mm 15mm;
+                padding: 0;
+                background-color: white !important;
+                color: black !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .ledger-table {
+                width: 100%;
+                border-collapse: collapse;
+                border: none;
+              }
+              .ledger-table td {
+                padding: 8px 0;
+                border: none;
+              }
+              .col-date {
+                width: 18%;
+                text-align: left;
+              }
+              .col-part {
+                width: 14%;
+                text-align: center;
+              }
+              .col-month {
+                width: 25%;
+                text-align: center;
+              }
+              .col-fees {
+                width: 11%;
+                text-align: center;
+              }
+              .col-inst {
+                width: 16%;
+                text-align: right;
+              }
+              .col-bal {
+                width: 16%;
+                text-align: right;
+              }
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+            </style>
+          </head>
+          <body>
+            <table class="ledger-table">
+              <tbody>
+                <tr>
+                  <td class="col-date">${row.date}</td>
+                  <td class="col-part">${row.particulars}</td>
+                  <td class="col-month">${row.month}</td>
+                  <td class="col-fees">${row.lateFees}</td>
+                  <td class="col-inst">${formatAmountRaw(row.amount)}</td>
+                  <td class="col-bal">${formatAmountRaw(row.balance || row.amount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.focus();
+          printFrame.contentWindow?.print();
+        } catch (printErr) {
+          console.error('Frame row print failure: ', printErr);
+        }
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1500);
+      }, 500);
+    }
+  };
+
   // Setup current on-screen page chunk representation
   const activeChunk = txnChunks[currentPage - 1] || [];
   const activePaddedChunk = [...activeChunk];
@@ -1060,14 +1417,34 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               </div>
             )}
 
+            {/* Print Details Only Button */}
+            <button
+              onClick={handlePrintDetailsOnly}
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
+              title="Print only customer and policy details cover page"
+            >
+              <BookOpen size={14} className="text-amber-400" />
+              <span>Print Details Only</span>
+            </button>
+
+            {/* Print Ledger Page Only Button */}
+            <button
+              onClick={handlePrintLedgerPageOnly}
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
+              title="Print only active page of 6 installments"
+            >
+              <Printer size={14} className="text-emerald-400" />
+              <span>Print Ledger Page (6 rows)</span>
+            </button>
+
             {/* Print button matching original styling */}
             <button
               onClick={handlePrint}
-              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold animate-pulse"
-              title="Print Selected Ledger Grid"
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
+              title="Print combined details with ledger list"
             >
               <Printer size={14} className="text-blue-400" />
-              <span>Print Checked Ledger</span>
+              <span>Print Combined Statement</span>
             </button>
 
             {/* Default PDF download backup */}
@@ -1134,10 +1511,11 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Address</td>
+                      
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Nominee Name</td>
-                      
+                   
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Plan</td>
@@ -1182,9 +1560,9 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                       <th className="border border-slate-950 text-center w-[12%] ww1">Particular</th>
                       <th className="border border-slate-950 text-center w-[25%] wwmonth">Installment Month</th>
                       <th className="border border-slate-950 text-center w-[10%] ww">Late Fees</th>
-                      <th className="border border-slate-950 text-right w-[15%] wwlate">Installment</th>
-                      <th className="border border-slate-950 text-right w-[13%] ww">Amount</th>
-                      <th className="border border-slate-950 text-center w-[10%] select-none">Receipt</th>
+                      <th className="border border-slate-950 text-right w-[14%] wwlate">Installment</th>
+                      <th className="border border-slate-950 text-right w-[12%] ww">Amount</th>
+                      <th className="border border-slate-950 text-center w-[16%] select-none">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1219,17 +1597,28 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                             <td className="p-2 sm:p-2.5 border border-slate-950 text-right font-mono font-bold">
                               {isPadded ? '--' : formatAmountRaw(t.amount)}
                             </td>
-                            {/* Receipt trigger actions */}
+                            {/* Actions Cell with Print Row option */}
                             <td className="p-1 sm:p-1.5 border border-slate-950 text-center select-none">
                               {!isPadded && (
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedReceiptIdx(isReceiptOpen ? null : t.index)}
-                                  className={`px-2 py-1 text-[10px] font-bold rounded-lg border flex items-center justify-center gap-1 w-full text-center cursor-pointer transition-all ${isReceiptOpen ? 'bg-amber-50 border-amber-300 text-amber-700 font-extrabold shadow' : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400'}`}
-                                >
-                                  <span>Receipt</span>
-                                  {isReceiptOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                                </button>
+                                <div className="flex flex-col gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePrintSingleRow(t)}
+                                    className="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md border border-emerald-700 flex items-center justify-center gap-1 w-full text-center cursor-pointer transition-all shadow-sm"
+                                    title="Print only this single installment line on passbook"
+                                  >
+                                    <Printer size={10} />
+                                    <span>Print Line</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedReceiptIdx(isReceiptOpen ? null : t.index)}
+                                    className={`px-1.5 py-0.5 text-[9px] font-bold rounded-md border border-slate-300 flex items-center justify-center gap-1 w-full text-center cursor-pointer transition-all ${isReceiptOpen ? 'bg-amber-100 border-amber-400 text-amber-800 font-extrabold shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}
+                                  >
+                                    <span>Receipt</span>
+                                    {isReceiptOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                                  </button>
+                                </div>
                               )}
                               {isPadded && '--'}
                             </td>
