@@ -1658,29 +1658,30 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
                   {/* Pagination Footer */}
                   {totalPages > 1 && (
-                    <div className="bg-[#22c55e] text-white flex items-center justify-center gap-8 py-3.5 px-6 select-none shadow-inner">
+                    <div className="bg-slate-50 border-t border-slate-200 text-slate-600 flex items-center justify-center gap-6 py-4 px-6 select-none shadow-xs">
                       {currentPage > 1 && (
                         <button
                           onClick={() => setInstalmentsPage(currentPage - 1)}
-                          className="font-bold text-xs hover:opacity-85 active:scale-95 transition-all cursor-pointer tracking-wider uppercase"
+                          className="font-bold text-xs text-slate-700 hover:text-blue-600 active:scale-95 transition-all cursor-pointer tracking-wider uppercase border border-slate-200 px-3.5 py-1.5 rounded-xl bg-white shadow-xs hover:border-slate-300"
                         >
                           Prev
                         </button>
                       )}
 
-                      <div className="flex items-center gap-6 text-sm font-bold">
+                      <div className="flex items-center gap-2 text-sm font-bold">
                         {pages.map(p => {
                           const isActive = p === currentPage;
                           return (
                             <button
                               key={p}
                               onClick={() => setInstalmentsPage(p)}
-                              className="relative flex flex-col items-center px-1.5 py-1 cursor-pointer transition-all hover:scale-105"
+                              className={`relative flex items-center justify-center h-8 w-8 rounded-xl cursor-pointer transition-all ${
+                                isActive 
+                                  ? 'bg-blue-600 text-white shadow-xs font-bold' 
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent'
+                              }`}
                             >
-                              <span className="text-sm tracking-wide">{p}</span>
-                              {isActive && (
-                                <span className="absolute bottom-[-1px] h-[5px] w-[5px] rounded-full bg-white animate-fade-in" />
-                              )}
+                              <span className="text-xs">{p}</span>
                             </button>
                           );
                         })}
@@ -1689,7 +1690,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       {currentPage < totalPages && (
                         <button
                           onClick={() => setInstalmentsPage(currentPage + 1)}
-                          className="font-bold text-xs hover:opacity-85 active:scale-95 transition-all cursor-pointer tracking-wider uppercase"
+                          className="font-bold text-xs text-slate-700 hover:text-blue-600 active:scale-95 transition-all cursor-pointer tracking-wider uppercase border border-slate-200 px-3.5 py-1.5 rounded-xl bg-white shadow-xs hover:border-slate-300"
                         >
                           Next
                         </button>
