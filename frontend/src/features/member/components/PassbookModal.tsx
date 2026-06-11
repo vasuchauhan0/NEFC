@@ -580,8 +580,9 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               <td colspan="4">: ${activeInv.id}</td>
             </tr>
             <tr class="r_border raw_received prow">
-              <td style="font-weight: 600;">Received From:</td>
-            </tr>
+  <td colspan="2" style="font-weight: 600;">Received From:</td>
+  <td colspan="4">: ${member.name}</td>
+</tr>
             <tr class="prow border-b border-gray-100">
               <td colspan="2" style="font-weight: 600;">Deposit Amount(In Words):</td>
               <td colspan="4" class="r_write_inword" style="font-style: italic;">: ${numberToEnglish(row.amount)}</td>
