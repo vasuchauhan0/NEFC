@@ -402,6 +402,19 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: 'Are you sure you want to delete this member? All of their active and historical investment records will be permanently discarded from the system.',
       onConfirm: async () => {
         const nextMembers = safeData.members.filter(m => m.id !== id);
+        try {
+          const API = import.meta.env.VITE_API_URL || '';
+          await fetch(`${API}/api/members`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+            },
+            body: JSON.stringify({ action: 'delete', id }),
+          });
+        } catch (err) {
+          console.error('Failed to delete member on backend:', err);
+        }
         await handleSaveData({ ...siteData, members: nextMembers }, 'Member account deleted');
         setSelectedDetailMemberId(null);
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -462,6 +475,19 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: `Are you sure you want to delete the scheme "${id}"? This catalog plan option will no longer be visible to newly booked investments.`,
       onConfirm: async () => {
         const next = safeData.schemes.filter(s => s.id !== id);
+        try {
+          const API = import.meta.env.VITE_API_URL || '';
+          await fetch(`${API}/api/schemes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+            },
+            body: JSON.stringify({ action: 'delete', id }),
+          });
+        } catch (err) {
+          console.error('Failed to delete scheme on backend:', err);
+        }
         await handleSaveData({ ...siteData, schemes: next }, 'Scheme discarded');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -576,6 +602,19 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
           }
           return m;
         });
+        try {
+          const API = import.meta.env.VITE_API_URL || '';
+          await fetch(`${API}/api/members`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+            },
+            body: JSON.stringify({ action: 'delete-investment', memberId, investmentId }),
+          });
+        } catch (err) {
+          console.error('Failed to delete investment on backend:', err);
+        }
         await handleSaveData({ ...siteData, members: updatedMembers }, 'Investment ledger record deleted');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -719,6 +758,19 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: 'Are you sure you want to permanently delete this support request message from the inbox records?',
       onConfirm: async () => {
         const remainingMsgs = safeData.messages.filter(m => m.id !== id);
+        try {
+          const API = import.meta.env.VITE_API_URL || '';
+          await fetch(`${API}/api/messages/delete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+            },
+            body: JSON.stringify({ id }),
+          });
+        } catch (err) {
+          console.error('Failed to delete message on backend:', err);
+        }
         await handleSaveData({ ...siteData, messages: remainingMsgs }, 'Message deleted from inbox');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
