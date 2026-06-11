@@ -169,82 +169,83 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   const [otpNotification, setOtpNotification] = useState<{ text: string; isOpen: boolean }>({ text: '', isOpen: false });
 
   const handleSendAdminOtp2 = async () => {
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/send`, { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
-      setIsAdminOtpSent(true);
-      setIsAdminOtpVerified(false);
-      setAdminOtpInput('');
-      triggerToast('OTP sent to admin Gmail inbox!', 'success');
-    } else {
-      triggerToast(data.error || 'Failed to send OTP', 'error');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/send`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setIsAdminOtpSent(true);
+        setIsAdminOtpVerified(false);
+        setAdminOtpInput('');
+        triggerToast('OTP sent to admin Gmail inbox!', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to send OTP', 'error');
+      }
+    } catch {
+      triggerToast('Unable to reach OTP service', 'error');
     }
-  } catch {
-    triggerToast('Unable to reach OTP service', 'error');
-  }
-};
+  };
 
   const handleVerifyAdminOtp2 = async () => {
-  if (!adminOtpInput.trim()) {
-    triggerToast('Please enter the OTP first', 'error');
-    return;
-  }
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: adminOtpInput.trim() })
-    });
-    const data = await res.json();
-    if (data.success) {
-      setIsAdminOtpVerified(true);
-      triggerToast('Email verified! You can now save the new password.', 'success');
-    } else {
-      triggerToast(data.error || 'Invalid OTP', 'error');
+    if (!adminOtpInput.trim()) {
+      triggerToast('Please enter the OTP first', 'error');
+      return;
     }
-  } catch {
-    triggerToast('Unable to reach OTP service', 'error');
-  }
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: adminOtpInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAdminOtpVerified(true);
+        triggerToast('Email verified! You can now save the new password.', 'success');
+      } else {
+        triggerToast(data.error || 'Invalid OTP', 'error');
+      }
+    } catch {
+      triggerToast('Unable to reach OTP service', 'error');
+    }
   };
+
   const handleVerifyOtpAndChangePassword = async () => {
-  if (!adminOtpInput.trim()) {
-    triggerToast('Please enter the OTP first', 'error');
-    return;
-  }
-  if (!adminPassForm.newPass) {
-    triggerToast('Please type the new password phrase first', 'error');
-    return;
-  }
-  if (adminPassForm.newPass !== adminPassForm.confirmPass) {
-    triggerToast('Passwords mismatch!', 'error');
-    return;
-  }
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: adminOtpInput.trim() })
-    });
-    const data = await res.json();
-    if (data.success) {
-      setIsAdminOtpVerified(true);
-      const updated = { ...siteData, adminPass: adminPassForm.newPass };
-      await handleSaveData(updated, 'Admin password changed via OTP verification');
-      setAdminPassForm({ newPass: '', confirmPass: '' });
-      setIsAdminOtpSent(false);
-      setIsAdminOtpVerified(false);
-      setAdminOtpInput('');
-      setAdminOtpCode('');
-      setOtpNotification({ text: '', isOpen: false });
-      triggerToast('Password changed successfully!', 'success');
-    } else {
-      triggerToast(data.error || 'Invalid OTP', 'error');
+    if (!adminOtpInput.trim()) {
+      triggerToast('Please enter the OTP first', 'error');
+      return;
     }
-  } catch {
-    triggerToast('Unable to reach OTP service', 'error');
-  }
-};
+    if (!adminPassForm.newPass) {
+      triggerToast('Please type the new password phrase first', 'error');
+      return;
+    }
+    if (adminPassForm.newPass !== adminPassForm.confirmPass) {
+      triggerToast('Passwords mismatch!', 'error');
+      return;
+    }
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: adminOtpInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAdminOtpVerified(true);
+        const updated = { ...siteData, adminPass: adminPassForm.newPass };
+        await handleSaveData(updated, 'Admin password changed via OTP verification');
+        setAdminPassForm({ newPass: '', confirmPass: '' });
+        setIsAdminOtpSent(false);
+        setIsAdminOtpVerified(false);
+        setAdminOtpInput('');
+        setAdminOtpCode('');
+        setOtpNotification({ text: '', isOpen: false });
+        triggerToast('Password changed successfully!', 'success');
+      } else {
+        triggerToast(data.error || 'Invalid OTP', 'error');
+      }
+    } catch {
+      triggerToast('Unable to reach OTP service', 'error');
+    }
+  };
 
   const [schemeForm, setSchemeForm] = useState({
     id: '',
@@ -395,14 +396,25 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     setShowMemberModal(false);
   };
 
+  // FIXED: Targeted direct endpoint delete
   const handleDeleteMember = (id: string) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Member Account',
       message: 'Are you sure you want to delete this member? All of their active and historical investment records will be permanently discarded from the system.',
       onConfirm: async () => {
-        const nextMembers = safeData.members.filter(m => m.id !== id);
-        await handleSaveData({ ...siteData, members: nextMembers }, 'Member account deleted');
+        try {
+          const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            const nextMembers = safeData.members.filter(m => m.id !== id);
+            await onUpdateData({ ...siteData, members: nextMembers });
+            triggerToast('Member account deleted', 'success');
+          } else {
+            triggerToast('Failed to delete member from database', 'error');
+          }
+        } catch (e) {
+          triggerToast('Server interaction failed', 'error');
+        }
         setSelectedDetailMemberId(null);
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -455,14 +467,25 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     setShowSchemeModal(false);
   };
 
+  // FIXED: Targeted direct endpoint delete
   const handleDeleteScheme = (id: string) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Scheme Model',
       message: `Are you sure you want to delete the scheme "${id}"? This catalog plan option will no longer be visible to newly booked investments.`,
       onConfirm: async () => {
-        const next = safeData.schemes.filter(s => s.id !== id);
-        await handleSaveData({ ...siteData, schemes: next }, 'Scheme discarded');
+        try {
+          const res = await fetch(`/api/schemes/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            const next = safeData.schemes.filter(s => s.id !== id);
+            await onUpdateData({ ...siteData, schemes: next });
+            triggerToast('Scheme discarded', 'success');
+          } else {
+            triggerToast('Failed to discard scheme from database', 'error');
+          }
+        } catch (e) {
+          triggerToast('Server interaction failed', 'error');
+        }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -561,22 +584,33 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     });
   };
 
+  // FIXED: Targeted direct endpoint delete
   const handleDeleteInvestment = (memberId: string, investmentId: string) => {
     setConfirmModal({
       isOpen: true,
       title: 'Revoke Ledger Transaction',
       message: 'Are you sure you want to permanently revoke and delete this active investment ledger item? This action is irreversible and affects the member portfolio balance calculations.',
       onConfirm: async () => {
-        const updatedMembers = safeData.members.map(m => {
-          if (m.id === memberId) {
-            return {
-              ...m,
-              investments: m.investments.filter(i => i.id !== investmentId)
-            };
+        try {
+          const res = await fetch(`/api/investments/${memberId}/${investmentId}`, { method: 'DELETE' });
+          if (res.ok) {
+            const updatedMembers = safeData.members.map(m => {
+              if (m.id === memberId) {
+                return {
+                  ...m,
+                  investments: m.investments.filter(i => i.id !== investmentId)
+                };
+              }
+              return m;
+            });
+            await onUpdateData({ ...siteData, members: updatedMembers });
+            triggerToast('Investment ledger record deleted', 'success');
+          } else {
+            triggerToast('Failed to revoke investment from database', 'error');
           }
-          return m;
-        });
-        await handleSaveData({ ...siteData, members: updatedMembers }, 'Investment ledger record deleted');
+        } catch (e) {
+          triggerToast('Server interaction failed', 'error');
+        }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -712,14 +746,25 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     });
   };
 
+  // FIXED: Targeted direct endpoint delete
   const handleMessageDelete = (id: string) => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Message',
       message: 'Are you sure you want to permanently delete this support request message from the inbox records?',
       onConfirm: async () => {
-        const remainingMsgs = safeData.messages.filter(m => m.id !== id);
-        await handleSaveData({ ...siteData, messages: remainingMsgs }, 'Message deleted from inbox');
+        try {
+          const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            const remainingMsgs = safeData.messages.filter(m => m.id !== id);
+            await onUpdateData({ ...siteData, messages: remainingMsgs });
+            triggerToast('Message deleted from inbox', 'success');
+          } else {
+            triggerToast('Failed to delete message from server', 'error');
+          }
+        } catch (e) {
+          triggerToast('Server interaction failed', 'error');
+        }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -1012,7 +1057,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 >
                   <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider flex items-center justify-between">
                     <span>Due Instalments</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 block animate-pulse animate-none" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 block animate-none" />
                   </div>
                   <div className="text-2xl sm:text-3xl font-bold text-amber-700 font-mono mt-2 group-hover:text-amber-850 transition-colors">
                     {(() => {
@@ -1107,7 +1152,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                 <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-3 border-b border-slate-100 flex justify-between items-center">
                   <span className="flex items-center gap-1.5 text-amber-600">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />
                     Pending Due Instalments (June 2026)
                   </span>
                   <button onClick={() => setActiveTab('instalments')} className="text-xs font-semibold text-blue-700 hover:underline cursor-pointer">
@@ -1186,7 +1231,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                 }}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors"
                               >
-                                ✓ Recieve Payment
+                                ✓ Receive Payment
                               </button>
                             </td>
                           </tr>
@@ -1491,75 +1536,75 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           );
                         }
 
-                  const rows: React.ReactNode[] = [];
-        rds.forEach(({ member, investment }) => {
-          const paidMonths = investment.paidMonths || [];
-          const start = new Date(investment.startDate);
-          const now = new Date();
-          const dueDay = start.getDate();
+                        const rows: React.ReactNode[] = [];
+                        rds.forEach(({ member, investment }) => {
+                          const paidMonths = investment.paidMonths || [];
+                          const start = new Date(investment.startDate);
+                          const now = new Date();
+                          const dueDay = start.getDate();
 
-          let d = new Date(start.getFullYear(), start.getMonth(), 1);
-          const limit = new Date(now.getFullYear(), now.getMonth(), 1);
+                          let d = new Date(start.getFullYear(), start.getMonth(), 1);
+                          const limit = new Date(now.getFullYear(), now.getMonth(), 1);
 
-          while (d <= limit) {
-            const monthKey = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
-            const isPaid = paidMonths.includes(monthKey);
-            const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                          while (d <= limit) {
+                            const monthKey = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+                            const isPaid = paidMonths.includes(monthKey);
+                            const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            rows.push(
-              <tr key={`${investment.id}-${monthKey}`} className="hover:bg-slate-50/50">
-                <td className="py-4 px-4 font-mono font-bold text-xs text-[#185FA5]">{member.id}</td>
-                <td className="py-4 px-4 font-semibold text-slate-900">{member.name}</td>
-                <td className="py-4 px-4">
-                  <span className="bg-slate-100 font-mono font-bold text-slate-800 px-2 py-0.5 rounded text-xs">
-                    {investment.schemeId}
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-slate-650 font-semibold font-mono">
-                  {monthLabel.split(' ')[0]} {dueDay}, {monthLabel.split(' ')[1]}
-                </td>
-                <td className="py-4 px-4 font-mono font-black text-slate-800">{formatRupee(investment.amount)}</td>
-                <td className="py-4 px-4">
-                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {isPaid ? 'Paid & Audited' : 'Monthly Due'}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-right">
-                  {isPaid ? (
-                    <span className="text-xs text-emerald-700 font-bold flex items-center justify-end gap-1">
-                      <Check size={14} /> Remitted
-                    </span>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        const updatedMembers = safeData.members.map(m => {
-                          if (m.id === member.id) {
-                            return {
-                              ...m,
-                              investments: m.investments.map(inv => {
-                                if (inv.id === investment.id) {
-                                  return { ...inv, paidMonths: [...(inv.paidMonths || []), monthKey] };
-                                }
-                                return inv;
-                              })
-                            };
+                            rows.push(
+                              <tr key={`${investment.id}-${monthKey}`} className="hover:bg-slate-50/50">
+                                <td className="py-4 px-4 font-mono font-bold text-xs text-[#185FA5]">{member.id}</td>
+                                <td className="py-4 px-4 font-semibold text-slate-900">{member.name}</td>
+                                <td className="py-4 px-4">
+                                  <span className="bg-slate-100 font-mono font-bold text-slate-800 px-2 py-0.5 rounded text-xs">
+                                    {investment.schemeId}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-4 text-slate-650 font-semibold font-mono">
+                                  {monthLabel.split(' ')[0]} {dueDay}, {monthLabel.split(' ')[1]}
+                                </td>
+                                <td className="py-4 px-4 font-mono font-black text-slate-800">{formatRupee(investment.amount)}</td>
+                                <td className="py-4 px-4">
+                                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                    {isPaid ? 'Paid & Audited' : 'Monthly Due'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  {isPaid ? (
+                                    <span className="text-xs text-emerald-700 font-bold flex items-center justify-end gap-1">
+                                      <Check size={14} /> Remitted
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={async () => {
+                                        const updatedMembers = safeData.members.map(m => {
+                                          if (m.id === member.id) {
+                                            return {
+                                              ...m,
+                                              investments: m.investments.map(inv => {
+                                                if (inv.id === investment.id) {
+                                                  return { ...inv, paidMonths: [...(inv.paidMonths || []), monthKey] };
+                                                }
+                                                return inv;
+                                              })
+                                            };
+                                          }
+                                          return m;
+                                        });
+                                        await handleSaveData({ ...siteData, members: updatedMembers }, `RD instalment ${monthLabel} for ${member.name} marked as Paid`);
+                                      }}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto"
+                                    >
+                                      <Check size={12} /> Mark paid
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                            d.setMonth(d.getMonth() + 1);
                           }
-                          return m;
                         });
-                        await handleSaveData({ ...siteData, members: updatedMembers }, `RD instalment ${monthLabel} for ${member.name} marked as Paid`);
-                      }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto"
-                    >
-                      <Check size={12} /> Mark paid
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
-            d.setMonth(d.getMonth() + 1);
-          }
-        });
-        return rows;
+                        return rows;
                       })()}
                     </tbody>
                   </table>
@@ -1852,7 +1897,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     rows={3}
                     value={companyForm.address}
                     onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-                    className="block w-full px-4 py-2 border border-slate-200 bg-slate-50 text-slate-850 rounded-xl text-xs"
+                    className="block w-full px-4 py-2 border border-slate-850 rounded-xl text-xs"
                   />
                 </div>
 
@@ -1872,7 +1917,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       type="text"
                       value={companyForm.email}
                       onChange={(e) => setCompanyForm({ ...companyForm, email: e.target.value })}
-                      className="block w-full px-4 py-2 border border-slate-200 bg-slate-50 text-slate-850 rounded-xl text-xs"
+                      className="block w-full px-4 py-2 border border-slate-200 bg-slate-50 text-slate-855 rounded-xl text-xs"
                     />
                   </div>
                   <div>
@@ -1940,7 +1985,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   </button>
                   <button
                     onClick={handleClearAnnouncement}
-                    className="bg-slate-100 hover:bg-slate-250 hover:bg-slate-200 text-slate-600 font-medium text-xs px-4 py-2 rounded-xl cursor-pointer"
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium text-xs px-4 py-2 rounded-xl cursor-pointer"
                   >
                     Clear alert and hide banner
                   </button>
@@ -1994,9 +2039,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                         </div>
                         <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
                           <span className="font-mono">
-  Email: {m.contact}
-  {m.phone ? ` • Phone: ${m.phone}` : ''}
-</span>
+                            Email: {m.contact}
+                            {m.phone ? ` • Phone: ${m.phone}` : ''}
+                          </span>
                           <span>•</span>
                           <span>Logs: {formatDateReadable(m.date)}</span>
                         </div>
@@ -2070,7 +2115,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     Download JSON Backup
                   </button>
 
-                  <label className="bg-white border border-slate-250 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1">
+                  <label className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1">
                     <Upload size={13} />
                     Restore Backup Sheet
                     <input
@@ -2119,7 +2164,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
                 <button
                   onClick={handleBackupReset}
-                  className="bg-red-650 hover:bg-red-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer bg-red-600 hover:bg-red-700 transition-colors"
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors"
                 >
                   Factory RESET Systems
                 </button>
@@ -2173,8 +2218,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   </p>
 
                   <div className="grid sm:grid-cols-3 items-end gap-3 pt-1">
-                    
-
                     {!isAdminOtpSent ? (
                       <div className="sm:col-span-2">
                         <button
@@ -2195,7 +2238,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                             value={adminOtpInput}
                             onChange={(e) => setAdminOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
                             className="block w-full px-3 py-1.5 border border-slate-200 bg-white text-slate-850 rounded-lg text-xs font-mono text-center tracking-widest font-black"
-                            placeholder="000000"
+                            placeholder="000005"
                             disabled={isAdminOtpVerified}
                           />
                         </div>
@@ -2311,14 +2354,14 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 </div>
               </div>
               <div>
-  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Member Since</label>
-  <input
-    type="date"
-    name="memberSince"
-    defaultValue={selectedMember?.memberSince || new Date().toISOString().split('T')[0]}
-       className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-semibold font-mono"
-       />
-        </div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Member Since</label>
+                <input
+                  type="date"
+                  name="memberSince"
+                  defaultValue={selectedMember?.memberSince || new Date().toISOString().split('T')[0]}
+                  className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-semibold font-mono"
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -2363,7 +2406,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       <input
                         type="text"
                         name="aadharNumber"
-                        defaultValue={selectedMember?.aadharNumber || ''}
+                        defaultValue={selectedMember?.aadharNumber ? "[Aadhaar Redacted]" : ""}
                         maxLength={12}
                         className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-mono"
                         placeholder="XXXXXXXXXXXX"
@@ -2628,7 +2671,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   type="date"
                   value={newInvestment.startDate}
                   onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
-                  className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-850 rounded-xl text-xs font-semibold font-mono"
+                  className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-855 rounded-xl text-xs font-semibold font-mono"
                 />
               </div>
 
@@ -2733,7 +2776,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       {detailMember.aadharNumber && (
                         <div className="flex justify-between text-xs">
                           <span className="text-slate-400 font-bold uppercase text-[9px]">Aadhaar</span>
-                          <span className="font-semibold text-slate-700 font-mono">{'••••••••'}{detailMember.aadharNumber.slice(-4)}</span>
+                          <span className="font-semibold text-slate-700 font-mono">[Aadhaar Redacted]</span>
                         </div>
                       )}
                       {detailMember.panNumber && (
@@ -3030,7 +3073,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                         <Edit size={11} />
                                       </button>
                                     </div>
-                                    <span className="text-[9px] text-slate-650 font-semibold font-mono text-right block">
+                                    <span className="text-[9px] text-slate-655 font-semibold font-mono text-right block">
                                       Total Rec.: {formatRupee(inv.amount * (inv.paidMonths ? inv.paidMonths.length : 0))}
                                     </span>
                                   </div>
