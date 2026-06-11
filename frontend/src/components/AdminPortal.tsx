@@ -401,10 +401,19 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Member Account',
       message: 'Are you sure you want to delete this member? All of their active and historical investment records will be permanently discarded from the system.',
       onConfirm: async () => {
-        const nextMembers = safeData.members.filter(m => m.id !== id);
-        await handleSaveData({ ...siteData, members: nextMembers }, 'Member account deleted');
-        setSelectedDetailMemberId(null);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        // REPLACE WITH:
+await fetch(`${import.meta.env.VITE_API_URL}/api/members`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-admin-token': localStorage.getItem('nefc_admin_token') || ''
+  },
+  body: JSON.stringify({ action: 'delete', id })
+});
+await onUpdateData({ ...siteData, members: siteData.members.filter(m => m.id !== id) });
+triggerToast('Member account deleted', 'success');
+setSelectedDetailMemberId(null);
+setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -461,9 +470,15 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Scheme Model',
       message: `Are you sure you want to delete the scheme "${id}"? This catalog plan option will no longer be visible to newly booked investments.`,
       onConfirm: async () => {
-        const next = safeData.schemes.filter(s => s.id !== id);
-        await handleSaveData({ ...siteData, schemes: next }, 'Scheme discarded');
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        // REPLACE WITH:
+await fetch(`${import.meta.env.VITE_API_URL}/api/schemes`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action: 'delete', id })
+});
+await onUpdateData({ ...siteData, schemes: siteData.schemes.filter(s => s.id !== id) });
+triggerToast('Scheme discarded', 'success');
+setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -567,17 +582,25 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Revoke Ledger Transaction',
       message: 'Are you sure you want to permanently revoke and delete this active investment ledger item? This action is irreversible and affects the member portfolio balance calculations.',
       onConfirm: async () => {
-        const updatedMembers = safeData.members.map(m => {
-          if (m.id === memberId) {
-            return {
-              ...m,
-              investments: m.investments.filter(i => i.id !== investmentId)
-            };
-          }
-          return m;
-        });
-        await handleSaveData({ ...siteData, members: updatedMembers }, 'Investment ledger record deleted');
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        // REPLACE WITH:
+await fetch(`${import.meta.env.VITE_API_URL}/api/members`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-admin-token': localStorage.getItem('nefc_admin_token') || ''
+  },
+  body: JSON.stringify({ action: 'delete-investment', memberId, investmentId })
+});
+await onUpdateData({
+  ...siteData,
+  members: siteData.members.map(m =>
+    m.id === memberId
+      ? { ...m, investments: m.investments.filter(i => i.id !== investmentId) }
+      : m
+  )
+});
+triggerToast('Investment ledger record deleted', 'success');
+setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -718,9 +741,18 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Message',
       message: 'Are you sure you want to permanently delete this support request message from the inbox records?',
       onConfirm: async () => {
-        const remainingMsgs = safeData.messages.filter(m => m.id !== id);
-        await handleSaveData({ ...siteData, messages: remainingMsgs }, 'Message deleted from inbox');
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        // REPLACE WITH:
+await fetch(`${import.meta.env.VITE_API_URL}/api/messages/delete`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-admin-token': localStorage.getItem('nefc_admin_token') || ''
+  },
+  body: JSON.stringify({ id })
+});
+await onUpdateData({ ...siteData, messages: siteData.messages.filter(m => m.id !== id) });
+triggerToast('Message deleted from inbox', 'success');
+setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
