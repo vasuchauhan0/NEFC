@@ -33,7 +33,8 @@ import {
   LogOut,
   TrendingUp,
   BookOpen,
-  Menu
+  Menu,
+  Search
 } from 'lucide-react';
 import { SiteData, Member, InvestmentScheme, ContactMessage, MemberInvestment } from '../shared/types/index.ts';
 import { formatRupee, formatDateReadable, addYearsToDate, calculateFDMaturity, calculateRDMaturity } from '../shared/utils/index.ts';
@@ -110,6 +111,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
   // Pagination state for local RD instalments list
   const [instalmentsPage, setInstalmentsPage] = useState<number>(1);
+  const [instalmentsSearch, setInstalmentsSearch] = useState<string>('');
 
   // Synchronize state with current data
   React.useEffect(() => {
@@ -1514,11 +1516,23 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
               return b.dueDate.getTime() - a.dueDate.getTime();
             });
 
+            // Filter instalmentsList based on the search state query
+            const filteredInstalments = instalmentsList.filter(item => {
+              if (!instalmentsSearch) return true;
+              const term = instalmentsSearch.toLowerCase().trim();
+              return (
+                item.member.name.toLowerCase().includes(term) ||
+                item.member.id.toLowerCase().includes(term) ||
+                item.investment.schemeId.toLowerCase().includes(term) ||
+                item.monthLabel.toLowerCase().includes(term)
+              );
+            });
+
             const itemsPerPage = 10;
-            const totalItems = instalmentsList.length;
+            const totalItems = filteredInstalments.length;
             const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
             const currentPage = Math.max(1, Math.min(instalmentsPage, totalPages));
-            const paginatedItems = instalmentsList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+            const paginatedItems = filteredInstalments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
             // Calculate pagination window pages (up to 5 page numbers)
             const pages: number[] = [];
@@ -1576,6 +1590,42 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       </strong>
                     </div>
                   </div>
+                </div>
+
+                {/* Search Bar matching website style */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/50 border border-slate-150 p-4 rounded-2xl shadow-2xs">
+                  <div className="relative w-full sm:w-80">
+                    <input
+                      type="text"
+                      value={instalmentsSearch}
+                      onChange={(e) => {
+                        setInstalmentsSearch(e.target.value);
+                        setInstalmentsPage(1); // Reset page selection on search
+                      }}
+                      className="w-full pl-9 pr-8 py-2 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs placeholder-slate-400 font-medium"
+                      placeholder="Search by name, member ID, scheme ID..."
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search size={14} />
+                    </div>
+                    {instalmentsSearch && (
+                      <button
+                        onClick={() => {
+                          setInstalmentsSearch('');
+                          setInstalmentsPage(1);
+                        }}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {instalmentsSearch && (
+                    <div className="text-xs text-slate-500 font-medium">
+                      Found <strong className="text-blue-600 font-semibold">{totalItems}</strong> matching instalments
+                    </div>
+                  )}
                 </div>
 
                 {/* Installments Table */}
