@@ -13,6 +13,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { Member, MemberInvestment } from '../../../shared/types/index.ts';
+import { calculateFDMaturity, calculateRDMaturity } from '../../../shared/utils/index.ts';
 
 interface PassbookModalProps {
   isOpen: boolean;
@@ -140,18 +141,10 @@ const getNextInstallmentDate = (dateStr: string): string => {
 
 // Helper: Safe math value calculation for RD & FD maturity
 const getMaturityAmount = (inv: MemberInvestment) => {
-  const years = inv.durationYears;
-  const p = inv.amount;
-  const r = inv.interestPct / 1200; // monthly fractional rate
   if (inv.schemeType === 'fd') {
-    return Math.round(p * Math.pow(1 + inv.interestPct / 100, years));
+    return calculateFDMaturity(inv.amount, inv.interestPct, inv.durationYears).maturityAmount;
   } else {
-    const n = years * 12;
-    let total = 0;
-    for (let i = 0; i < n; i++) {
-      total = (total + p) * (1 + r);
-    }
-    return Math.round(total);
+    return calculateRDMaturity(inv.amount, inv.interestPct, inv.durationYears).maturityAmount;
   }
 };
 
@@ -192,9 +185,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
   const isRDSelected = activeInv.schemeType === 'rd';
 
   // Helper: Address and Nominee dynamic calculations
- 
-
-
   // Helper: Get transaction list for RD
   const getRDTransactions = (inv: MemberInvestment) => {
     const paidMonths = [...(inv.paidMonths || [])].sort();
@@ -205,7 +195,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
       return {
         index: index + 1,
         date: dateStr,
-        particulars: `1-${index + 1}`,
+        particulars: `${index + 1}-${index + 1}`,
         month: getInstallmentMonth(dateStr),
         lateFees: '--',
         amount: inv.amount,
@@ -366,6 +356,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     doc.setFont('Helvetica', 'bold');
     doc.text('Address:', 20, 128);
     doc.setFont('Helvetica', 'normal');
+
   
 
     doc.setFont('Helvetica', 'bold');
@@ -641,6 +632,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               </tr>
               <tr class="r_border raw_received prow">
                 <td style="font-weight: 600;">Received From:</td>
+         
               </tr>
               <tr class="prow border-b border-gray-100">
                 <td colspan="2" style="font-weight: 600;">Deposit Amount(In Words):</td>
@@ -765,11 +757,11 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               </tr>
               <tr>
                 <td style="font-weight: 600; background-color: #f7f9fa;">Address</td>
-              
+                
               </tr>
               <tr>
                 <td style="font-weight: 600; background-color: #f7f9fa;">Nominee Name</td>
-            
+                
               </tr>
               <tr>
                 <td style="font-weight: 600; background-color: #f7f9fa;">Plan</td>
@@ -820,7 +812,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                         ${isPadded ? '--' : formatAmountRaw(t.amount)}
                       </td>
                       <td class="ww" style="font-family: monospace; font-weight: bold;">
-                        ${isPadded ? '--' : formatAmountRaw(t.amount)}
+                        ${isPadded ? '--' : formatAmountRaw(t.balance || t.amount)}
                       </td>
                     </tr>
                   `;
@@ -1074,7 +1066,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               </tr>
               <tr>
                 <td class="lbl">Address</td>
-             
+                
               </tr>
               <tr>
                 <td class="lbl">Nominee Name</td>
@@ -1515,7 +1507,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Nominee Name</td>
-                   
+                      
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Plan</td>
@@ -1595,7 +1587,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                               {isPadded ? '--' : formatAmountRaw(t.amount)}
                             </td>
                             <td className="p-2 sm:p-2.5 border border-slate-950 text-right font-mono font-bold">
-                              {isPadded ? '--' : formatAmountRaw(t.amount)}
+                              {isPadded ? '--' : formatAmountRaw(t.balance || t.amount)}
                             </td>
                             {/* Actions Cell with Print Row option */}
                             <td className="p-1 sm:p-1.5 border border-slate-950 text-center select-none">
