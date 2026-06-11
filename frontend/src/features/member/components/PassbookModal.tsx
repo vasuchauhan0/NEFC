@@ -154,9 +154,8 @@ const getMaturityAmount = (inv: MemberInvestment) => {
 // Layout dropdown. Omitting the orientation keyword lets Chrome expose it.
 const PAGE_LAYOUT_CSS = `
   @page {
-    size: A4;
-    margin: 0;
-  }
+  margin: 0;
+}
 `;
 
 export default function PassbookModal({ isOpen, onClose, member, company }: PassbookModalProps) {
