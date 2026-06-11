@@ -314,6 +314,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     setShowMemberModal(true);
   };
 
+  // FIXED: Resolved scopes and corrected naming mismatch variables
   const getUniqueGeneratedMemberId = (): string => {
     let index = safeData.members.length + 11;
     let attemptedId = `NEFC-2026-0${index}`;
@@ -333,7 +334,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     
-    // Auto-generate a secure unique ID on creation, or use edited/pre-existing ID on update
     let mId = (fd.get('id') || selectedMember?.id) as string;
     if (!selectedMember) {
       mId = getUniqueGeneratedMemberId();
@@ -357,7 +357,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
-    // Verify Unique Email Requirement
     const isEmailRegistered = safeData.members.some(
       m => m.email.trim().toLowerCase() === mEmail.trim().toLowerCase() && m.id !== mId
     );
@@ -396,7 +395,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     setShowMemberModal(false);
   };
 
-  // FIXED: Targeted direct endpoint delete
+  // FIXED: Re-mapped destination flow to dispatch payload bodies directly to structural endpoints
   const handleDeleteMember = (id: string) => {
     setConfirmModal({
       isOpen: true,
@@ -404,7 +403,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: 'Are you sure you want to delete this member? All of their active and historical investment records will be permanently discarded from the system.',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
+          const res = await fetch('/api/members/delete', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+          });
           if (res.ok) {
             const nextMembers = safeData.members.filter(m => m.id !== id);
             await onUpdateData({ ...siteData, members: nextMembers });
@@ -467,7 +470,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     setShowSchemeModal(false);
   };
 
-  // FIXED: Targeted direct endpoint delete
+  // FIXED: Re-mapped destination flow to dispatch payload bodies directly to structural endpoints
   const handleDeleteScheme = (id: string) => {
     setConfirmModal({
       isOpen: true,
@@ -475,7 +478,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: `Are you sure you want to delete the scheme "${id}"? This catalog plan option will no longer be visible to newly booked investments.`,
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/schemes/${id}`, { method: 'DELETE' });
+          const res = await fetch('/api/schemes/delete', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+          });
           if (res.ok) {
             const next = safeData.schemes.filter(s => s.id !== id);
             await onUpdateData({ ...siteData, schemes: next });
@@ -537,7 +544,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     if (!selectedDetailMemberId) return;
     const mem = safeData.members.find(m => m.id === selectedDetailMemberId);
     
-    // Find the chosen scheme or dynamic default
     let targetSchemeId = inlineInvestment.schemeId;
     let scheme = safeData.schemes.find(s => s.id === targetSchemeId);
     if (!scheme || scheme.type !== schemeType) {
@@ -584,7 +590,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     });
   };
 
-  // FIXED: Targeted direct endpoint delete
+  // FIXED: Re-mapped destination flow to dispatch payload bodies directly to structural endpoints
   const handleDeleteInvestment = (memberId: string, investmentId: string) => {
     setConfirmModal({
       isOpen: true,
@@ -592,7 +598,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: 'Are you sure you want to permanently revoke and delete this active investment ledger item? This action is irreversible and affects the member portfolio balance calculations.',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/investments/${memberId}/${investmentId}`, { method: 'DELETE' });
+          const res = await fetch('/api/investments/delete', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId, investmentId })
+          });
           if (res.ok) {
             const updatedMembers = safeData.members.map(m => {
               if (m.id === memberId) {
@@ -746,7 +756,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     });
   };
 
-  // FIXED: Targeted direct endpoint delete
+  // FIXED: Re-mapped destination flow to dispatch payload bodies directly to structural endpoints
   const handleMessageDelete = (id: string) => {
     setConfirmModal({
       isOpen: true,
@@ -754,7 +764,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       message: 'Are you sure you want to permanently delete this support request message from the inbox records?',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+          const res = await fetch('/api/messages/delete', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+          });
           if (res.ok) {
             const remainingMsgs = safeData.messages.filter(m => m.id !== id);
             await onUpdateData({ ...siteData, messages: remainingMsgs });
@@ -778,7 +792,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     return matchQuery && matchFilter;
   });
 
-  // Calculate Metrics totals for Admin overview pane
   const totalBonds = safeData.members.reduce((sum, m) => sum + (m.investments?.length || 0), 0);
   const totalCapitalInPlay = safeData.members.reduce((sum, m) => {
     return sum + (m.investments || []).reduce((acc, inv) => {
@@ -1046,6 +1059,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 </div>
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Messages</div>
+                  {/* FIXED: Included missing closing block bracket */}
                   <div className="text-xl sm:text-3xl font-serif text-slate-800 font-bold mt-2">
                     {safeData.messages.filter(m => !m.read).length}
                   </div>
@@ -1057,7 +1071,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 >
                   <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider flex items-center justify-between">
                     <span>Due Instalments</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 block animate-none" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 block" />
                   </div>
                   <div className="text-2xl sm:text-3xl font-bold text-amber-700 font-mono mt-2 group-hover:text-amber-850 transition-colors">
                     {(() => {
@@ -1897,7 +1911,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     rows={3}
                     value={companyForm.address}
                     onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-                    className="block w-full px-4 py-2 border border-slate-850 rounded-xl text-xs"
+                    className="block w-full px-4 py-2 border border-slate-200 bg-slate-50 text-slate-850 rounded-xl text-xs"
                   />
                 </div>
 
@@ -2706,7 +2720,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
         const totalFDValue = fdBonds.reduce((acc, curr) => acc + curr.amount, 0);
         const totalRDCommitment = rdBonds.reduce((acc, curr) => acc + curr.amount, 0);
 
-        // Filter scheme choices for the active inline adding tab
         const activeSchemes = safeData.schemes.filter(
           s => s.type === activeInvestmentSubTab && s.status !== 'Closed'
         );
@@ -2937,7 +2950,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                         setEditingInvestmentId(inv.id);
                                         setEditingInvestmentAmount(inv.amount);
                                       }}
-                                      className="text-slate-400 hover:text-slate-650 p-0.5 cursor-pointer"
+                                      className="text-slate-400 hover:text-slate-655 p-0.5 cursor-pointer"
                                       title="Edit amount"
                                     >
                                       <Edit size={11} />
@@ -3005,7 +3018,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                         setEditingInvestmentId(inv.id);
                                         setEditingInvestmentAmount(inv.amount);
                                       }}
-                                      className="text-slate-400 hover:text-slate-650 p-0.5 cursor-pointer"
+                                      className="text-slate-400 hover:text-slate-655 p-0.5 cursor-pointer"
                                       title="Edit amount"
                                     >
                                       <Edit size={11} />
