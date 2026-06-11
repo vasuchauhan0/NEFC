@@ -97,30 +97,6 @@ export default function App() {
       }
     };
     fetchRecordData();
-
-    // Refresh logged-in member data from backend to avoid stale localStorage
-    const memberToken = localStorage.getItem('nefc_member_token');
-    if (memberToken) {
-      fetch(`${API}/api/member/me`, {
-        headers: { 'Authorization': `Bearer ${memberToken}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.member) {
-            setLoggedInMember(data.member);
-            localStorage.setItem('nefc_member', JSON.stringify(data.member));
-          } else {
-            // Token expired or member suspended — force logout
-            localStorage.removeItem('nefc_member');
-            localStorage.removeItem('nefc_member_token');
-            setLoggedInMember(null);
-            setActivePage('home');
-          }
-        })
-        .catch(() => {
-          // Network error — keep existing localStorage data as fallback
-        });
-    }
   }, []);
 
   useEffect(() => {
@@ -135,16 +111,16 @@ export default function App() {
   }, []);
 
   const handleUpdateData = async (newData: SiteData) => {
+    // Update UI immediately — user sees the change at once
     setSiteData(newData);
-    try {
-      await fetch(`${API}/api/data/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newData)
-      });
-    } catch (e) {
-      console.error('Failed to auto-sync layout definitions with Express server backend', e);
-    }
+    // Fire-and-forget background sync — do NOT await this.
+    // The UI is already updated above; making the user wait for the server
+    // round trip is what causes the perceived delay on every CRUD action.
+    fetch(`${API}/api/data/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newData)
+    }).catch(e => console.error('Background sync failed:', e));
   };
 
   const handleMemberLogin = async (e: React.FormEvent) => {
@@ -165,7 +141,6 @@ export default function App() {
       if (data.success && data.member) {
         setLoggedInMember(data.member);
         localStorage.setItem('nefc_member', JSON.stringify(data.member));
-        if (data.token) localStorage.setItem('nefc_member_token', data.token);
         setActivePage('dashboard');
         setMemberEmail('');
         setMemberPass('');
@@ -222,7 +197,6 @@ export default function App() {
     setIsAdminLoggedIn(false);
     setActivePage('home');
     localStorage.removeItem('nefc_member');
-    localStorage.removeItem('nefc_member_token');
     localStorage.removeItem('nefc_admin');
     localStorage.removeItem('nefc_admin_token');
   };
@@ -307,7 +281,6 @@ export default function App() {
                   if (data.success && data.member) {
                     setLoggedInMember(data.member);
                     localStorage.setItem('nefc_member', JSON.stringify(data.member));
-                    if (data.token) localStorage.setItem('nefc_member_token', data.token);
                     setActivePage('dashboard');
                     setMemberEmail('');
                     setMemberPass('');

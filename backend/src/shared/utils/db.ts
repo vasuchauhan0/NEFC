@@ -14,32 +14,31 @@ export { supabase };
 
 const settingKeys = ['adminPass', 'company', 'hero', 'announcement', 'stats', 'steps', 'trust'] as const;
 
-// ─── Helper: load all site_settings ──────────────────────────────────────────
-async function getSettings(): Promise<Omit<SiteData, 'schemes' | 'members' | 'messages'>> {
-  const { data } = await supabase.from('site_settings').select('key, value');
-  const map: Record<string, any> = {};
-  for (const row of data || []) map[row.key] = row.value;
-
-  return {
-    adminPass:    map['adminPass']    ?? 'admin123',
-    company:      map['company']      ?? {},
-    hero:         map['hero']         ?? {},
-    announcement: map['announcement'] ?? '',
-    stats:        map['stats']        ?? [],
-    steps:        map['steps']        ?? [],
-    trust:        map['trust']        ?? [],
-  };
-}
-
 // ─── getDatabase ──────────────────────────────────────────────────────────────
+// All 5 Supabase queries fire in a single Promise.all — no hidden extra round
+// trip from a separate getSettings() call.
 export async function getDatabase(): Promise<SiteData> {
-  const [settings, schemesRes, membersRes, messagesRes, investmentsRes] = await Promise.all([
-    getSettings(),
+  const [settingsRes, schemesRes, membersRes, messagesRes, investmentsRes] = await Promise.all([
+    supabase.from('site_settings').select('key, value'),
     supabase.from('schemes').select('*'),
     supabase.from('members').select('*'),
     supabase.from('contact_messages').select('*'),
     supabase.from('member_investments').select('*'),
   ]);
+
+  // Map site_settings rows into a lookup object
+  const settingsMap: Record<string, any> = {};
+  for (const row of settingsRes.data || []) settingsMap[row.key] = row.value;
+
+  const settings = {
+    adminPass:    settingsMap['adminPass']    ?? 'admin123',
+    company:      settingsMap['company']      ?? {},
+    hero:         settingsMap['hero']         ?? {},
+    announcement: settingsMap['announcement'] ?? '',
+    stats:        settingsMap['stats']        ?? [],
+    steps:        settingsMap['steps']        ?? [],
+    trust:        settingsMap['trust']        ?? [],
+  };
 
   const schemes: InvestmentScheme[] = (schemesRes.data || []).map((r: any) => ({
     id: r.id,
@@ -98,49 +97,10 @@ export async function getDatabase(): Promise<SiteData> {
 // It does NOT delete anything. Deletions must be done explicitly via the
 // direct helper functions below. This prevents race conditions where a
 // stale in-memory snapshot accidentally deletes records added by other requests.
+//
+// All upserts run in parallel via Promise.all — previously they were sequential
+// (5 × ~150ms = ~750ms). Now they all fire at once and finish together.
 export async function saveDatabase(data: SiteData): Promise<void> {
-
-  // Upsert settings
-  await supabase.from('site_settings').upsert(
-    settingKeys.map(key => ({ key, value: data[key] }))
-  );
-
-  // Upsert schemes
-  if (data.schemes.length > 0) {
-    await supabase.from('schemes').upsert(
-      data.schemes.map((s: any) => ({
-        id: s.id,
-        type: s.type,
-        duration_years: s.durationYears,
-        interest_pct: s.interestPct,
-        maturity_amount_preview: s.maturityAmountPreview,
-        status: s.status,
-      }))
-    );
-  }
-
-  // Upsert members
-  if (data.members.length > 0) {
-    await supabase.from('members').upsert(
-      data.members.map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        email: m.email,
-        phone: m.phone,
-        city: m.city,
-        password: m.password,
-        status: m.status,
-        member_since: m.memberSince,
-        father_name: m.fatherName ?? null,
-        aadhar_number: m.aadharNumber ?? null,
-        pan_number: m.panNumber ?? null,
-        nominee_name: m.nomineeName ?? null,
-        nominee_relation: m.nomineeRelation ?? null,
-      }))
-    );
-  }
-
-  // Upsert investments
   const allInvestments = data.members.flatMap((m: any) =>
     (m.investments || []).map((i: any) => ({
       id: i.id,
@@ -157,31 +117,77 @@ export async function saveDatabase(data: SiteData): Promise<void> {
     }))
   );
 
-  if (allInvestments.length > 0) {
-    await supabase.from('member_investments').upsert(allInvestments);
-  }
+  await Promise.all([
+    // Settings
+    supabase.from('site_settings').upsert(
+      settingKeys.map(key => ({ key, value: data[key] }))
+    ),
 
-  // Upsert messages
-  if (data.messages.length > 0) {
-    await supabase.from('contact_messages').upsert(
-      data.messages.map((msg: any) => ({
-        id: msg.id,
-        name: msg.name,
-        contact: msg.contact,
-        subject: msg.subject,
-        message: msg.message,
-        date: msg.date,
-        read: msg.read,
-      }))
-    );
-  }
+    // Schemes
+    data.schemes.length > 0
+      ? supabase.from('schemes').upsert(
+          data.schemes.map((s: any) => ({
+            id: s.id,
+            type: s.type,
+            duration_years: s.durationYears,
+            interest_pct: s.interestPct,
+            maturity_amount_preview: s.maturityAmountPreview,
+            status: s.status,
+          }))
+        )
+      : Promise.resolve(),
+
+    // Members
+    data.members.length > 0
+      ? supabase.from('members').upsert(
+          data.members.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            phone: m.phone,
+            city: m.city,
+            password: m.password,
+            status: m.status,
+            member_since: m.memberSince,
+            father_name: m.fatherName ?? null,
+            aadhar_number: m.aadharNumber ?? null,
+            pan_number: m.panNumber ?? null,
+            nominee_name: m.nomineeName ?? null,
+            nominee_relation: m.nomineeRelation ?? null,
+          }))
+        )
+      : Promise.resolve(),
+
+    // Investments
+    allInvestments.length > 0
+      ? supabase.from('member_investments').upsert(allInvestments)
+      : Promise.resolve(),
+
+    // Messages
+    data.messages.length > 0
+      ? supabase.from('contact_messages').upsert(
+          data.messages.map((msg: any) => ({
+            id: msg.id,
+            name: msg.name,
+            contact: msg.contact,
+            subject: msg.subject,
+            message: msg.message,
+            date: msg.date,
+            read: msg.read,
+          }))
+        )
+      : Promise.resolve(),
+  ]);
 }
 
 // ─── Direct delete helpers (use these instead of snapshot-based deletes) ─────
 
 export async function deleteMemberById(id: string): Promise<void> {
-  await supabase.from('member_investments').delete().eq('member_id', id);
-  await supabase.from('members').delete().eq('id', id);
+  // Delete investments and member row in parallel — no dependency between them
+  await Promise.all([
+    supabase.from('member_investments').delete().eq('member_id', id),
+    supabase.from('members').delete().eq('id', id),
+  ]);
 }
 
 export async function deleteSchemeById(id: string): Promise<void> {
