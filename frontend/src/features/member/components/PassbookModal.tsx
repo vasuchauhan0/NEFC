@@ -241,29 +241,24 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     printWin.document.open();
     printWin.document.write(htmlContent);
     printWin.document.close();
-    // Wait for resources to load then auto-open print dialog
-    printWin.onload = () => {
-      try {
-        printWin.focus();
-        printWin.print();
-        // Close the popup after the print dialog is dismissed
-        printWin.onafterprint = () => printWin.close();
-      } catch (err) {
-        console.error('Print invocation failure:', err);
-      }
-    };
-    // Fallback: if onload already fired (e.g. no external resources)
+
+    // Use a single, reliable timeout to trigger focus, print, and auto-close.
+    // This avoids registration of double-firing load events or about:blank vs written doc load event races.
     setTimeout(() => {
       try {
-        if (!printWin.closed) {
+        if (printWin && !printWin.closed) {
           printWin.focus();
+          printWin.onafterprint = () => {
+            try {
+              printWin.close();
+            } catch (e) {}
+          };
           printWin.print();
-          printWin.onafterprint = () => printWin.close();
         }
       } catch (err) {
-        // already handled above
+        console.error('Print trigger failed:', err);
       }
-    }, 500);
+    }, 300);
   };
   // jsPDF Standard File Exporter
   const handleDownloadPDF = () => {
