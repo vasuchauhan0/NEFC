@@ -148,6 +148,17 @@ const getMaturityAmount = (inv: MemberInvestment) => {
   }
 };
 
+// ─── Shared @page CSS that enables the Layout (Portrait/Landscape) toggle ────
+// NOTE: Using `size: A4` WITHOUT a hardcoded orientation is the key.
+// When `size: A4 portrait` is set, Chrome locks orientation and hides the
+// Layout dropdown. Omitting the orientation keyword lets Chrome expose it.
+const PAGE_LAYOUT_CSS = `
+  @page {
+    size: A4;
+    margin: 0;
+  }
+`;
+
 export default function PassbookModal({ isOpen, onClose, member, company }: PassbookModalProps) {
   const activeInvestments = member.investments || [];
   
@@ -184,7 +195,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
 
   const isRDSelected = activeInv.schemeType === 'rd';
 
-  // Helper: Address and Nominee dynamic calculations
   // Helper: Get transaction list for RD
   const getRDTransactions = (inv: MemberInvestment) => {
     const paidMonths = [...(inv.paidMonths || [])].sort();
@@ -245,6 +255,38 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
       ...prev,
       [idx]: !prev[idx]
     }));
+  };
+
+  // ─── Helper: create, write, and trigger print on a hidden iframe ──────────
+  const triggerIframePrint = (iframeName: string, htmlContent: string) => {
+    const printFrame = document.createElement('iframe');
+    printFrame.name = iframeName;
+    printFrame.style.position = 'absolute';
+    printFrame.style.top = '-9999px';
+    printFrame.style.left = '-9999px';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(htmlContent);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.focus();
+          printFrame.contentWindow?.print();
+        } catch (printErr) {
+          console.error('Print invocation failure:', printErr);
+        }
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1500);
+      }, 500);
+    }
   };
 
   // jsPDF Standard File Exporter
@@ -356,8 +398,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     doc.setFont('Helvetica', 'bold');
     doc.text('Address:', 20, 128);
     doc.setFont('Helvetica', 'normal');
-
-  
 
     doc.setFont('Helvetica', 'bold');
     doc.text('Account Status:', 110, 146);
@@ -551,143 +591,120 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     doc.save(fileName);
   };
 
-  // PRINT INDIVIDUAL DYNAMIC RENEWAL RECEIPT
+  // ─── PRINT INDIVIDUAL DYNAMIC RENEWAL RECEIPT ────────────────────────────
+  // Layout toggle enabled: `size: A4` without locked orientation
   const handlePrintReceipt = (row: any) => {
-    const printFrame = document.createElement('iframe');
-    printFrame.name = 'nefc_row_receipt_iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
+    triggerIframePrint('nefc_row_receipt_iframe', `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Renewal Receipt - ${activeInv.id}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 15mm;
+              background-color: white !important;
+              color: black !important;
+            }
+            .renewal_table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+              font-size: 13px;
+            }
+            .renewl-head td {
+              text-align: center;
+              font-weight: bold;
+              font-size: 16px;
+              padding: 10px;
+              border-bottom: 2px dashed #000;
+            }
+            .prow td {
+              padding: 6px 10px;
+              vertical-align: middle;
+            }
+            .r_border td {
+              border-bottom: 1px dashed #ccc;
+            }
+            .r_border_box td {
+              border: 1px solid #000;
+              padding: 8px;
+              text-align: center;
+            }
+            .colc {
+              text-align: center;
+            }
+            .frow td {
+              text-align: center;
+              font-weight: bold;
+              font-size: 11px;
+              padding-top: 25px;
+              border-top: 1px dashed #000;
+              margin-top: 30px;
+            }
+            /* ── Layout toggle fix: size: A4 without orientation lock ── */
+            @page {
+              size: A4;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <table width="100%" cellpadding="10" cellspacing="10" class="renewal_table">
+            <tr class="renewl-head">
+              <td colspan="6" class="renewal">RENEWAL RECEIPT</td>
+            </tr>
+            <tr class="prow"> 
+              <td style="font-weight: 600;" colspan="2">Issuing Branch</td>
+              <td>: Mohan Nagar</td>
+              <td style="font-weight: 600; text-align: right;" colspan="2">MEMBER ID</td>
+              <td>: ${member.id}</td>
+            </tr>
+            <tr class="r_border prow">
+              <td colspan="2" style="font-weight: 600;">Account No/Certificate No</td>
+              <td colspan="4">: ${activeInv.id}</td>
+            </tr>
+            <tr class="r_border raw_received prow">
+              <td style="font-weight: 600;">Received From:</td>
+            </tr>
+            <tr class="prow border-b border-gray-100">
+              <td colspan="2" style="font-weight: 600;">Deposit Amount(In Words):</td>
+              <td colspan="4" class="r_write_inword" style="font-style: italic;">: ${numberToEnglish(row.amount)}</td>
+            </tr>
+            
+            <tr style="height: 15px;"><td colspan="6"></td></tr>
 
-    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-    if (frameDoc) {
-      const receiptHTML = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Renewal Receipt - ${activeInv.id}</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                margin: 15mm;
-                background-color: white !important;
-                color: black !important;
-              }
-              .renewal_table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 15px;
-                font-size: 13px;
-              }
-              .renewl-head td {
-                text-align: center;
-                font-weight: bold;
-                font-size: 16px;
-                padding: 10px;
-                border-bottom: 2px dashed #000;
-              }
-              .prow td {
-                padding: 6px 10px;
-                vertical-align: middle;
-              }
-              .r_border td {
-                border-bottom: 1px dashed #ccc;
-              }
-              .r_border_box td {
-                border: 1px solid #000;
-                padding: 8px;
-                text-align: center;
-              }
-              .colc {
-                text-align: center;
-              }
-              .frow td {
-                text-align: center;
-                font-weight: bold;
-                font-size: 11px;
-                padding-top: 25px;
-                border-top: 1px dashed #000;
-                margin-top: 30px;
-              }
-            </style>
-          </head>
-          <body>
-            <table width="100%" cellpadding="10" cellspacing="10" class="renewal_table">
-              <tr class="renewl-head">
-                <td colspan="6" class="renewal">RENEWAL RECEIPT</td>
-              </tr>
-              <tr class="prow"> 
-                <td style="font-weight: 600;" colspan="2">Issuing Branch</td>
-                <td>: Mohan Nagar</td>
-                <td style="font-weight: 600; text-align: right;" colspan="2">MEMBER ID</td>
-                <td>: ${member.id}</td>
-              </tr>
-              <tr class="r_border prow">
-                <td colspan="2" style="font-weight: 600;">Account No/Certificate No</td>
-                <td colspan="4">: ${activeInv.id}</td>
-              </tr>
-              <tr class="r_border raw_received prow">
-                <td style="font-weight: 600;">Received From:</td>
-         
-              </tr>
-              <tr class="prow border-b border-gray-100">
-                <td colspan="2" style="font-weight: 600;">Deposit Amount(In Words):</td>
-                <td colspan="4" class="r_write_inword" style="font-style: italic;">: ${numberToEnglish(row.amount)}</td>
-              </tr>
-              
-              <tr style="height: 15px;"><td colspan="6"></td></tr>
+            <tr class="r_border_box prow">
+              <td class="colc" style="font-weight: 600;">Deposit Date</td>
+              <td class="colc" style="font-weight: 600;">Period</td>
+              <td class="colc" style="font-weight: 600;">Plan</td>
+              <td class="colc" style="font-weight: 600;">Premium No</td>
+              <td class="colc" style="font-weight: 600;">Amount</td>
+              <td class="colc" style="font-weight: 600;">Next Installment</td>
+            </tr>
+            <tr class="r_border_box prow">
+              <td class="colc">${row.date}</td>
+              <td class="colc">${activeInv.durationYears * 12} Months</td>
+              <td class="colc">${activeInv.schemeId}</td>
+              <td class="colc">${row.particulars}</td>
+              <td class="colc">${formatAmountRaw(row.amount)}</td>
+              <td class="colc">${getNextInstallmentDate(row.date)}</td>
+            </tr>
+            
+            <tr style="height: 35px;"><td colspan="6"></td></tr>
 
-              <tr class="r_border_box prow">
-                <td class="colc" style="font-weight: 600;">Deposit Date</td>
-                <td class="colc" style="font-weight: 600;">Period</td>
-                <td class="colc" style="font-weight: 600;">Plan</td>
-                <td class="colc" style="font-weight: 600;">Premium No</td>
-                <td class="colc" style="font-weight: 600;">Amount</td>
-                <td class="colc" style="font-weight: 600;">Next Installment</td>
-              </tr>
-              <tr class="r_border_box prow">
-                <td class="colc">${row.date}</td>
-                <td class="colc">${activeInv.durationYears * 12} Months</td>
-                <td class="colc">${activeInv.schemeId}</td>
-                <td class="colc">${row.particulars}</td>
-                <td class="colc">${formatAmountRaw(row.amount)}</td>
-                <td class="colc">${getNextInstallmentDate(row.date)}</td>
-              </tr>
-              
-              <tr style="height: 35px;"><td colspan="6"></td></tr>
-
-              <tr class="frow">
-                <td colspan="6">Nation Empower co-operative society</td>
-              </tr>
-            </table>
-          </body>
-        </html>
-      `;
-      frameDoc.open();
-      frameDoc.write(receiptHTML);
-      frameDoc.close();
-
-      setTimeout(() => {
-        try {
-          printFrame.contentWindow?.focus();
-          printFrame.contentWindow?.print();
-        } catch (printErr) {
-          console.error('Frame printed invocation failure: ', printErr);
-        }
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1500);
-      }, 500);
-    }
+            <tr class="frow">
+              <td colspan="6">Nation Empower co-operative society</td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `);
   };
 
-  // PRINT BULK LEDGER PAGES WITH SELECTIVE CHECKBOXES
+  // ─── PRINT BULK LEDGER PAGES WITH SELECTIVE CHECKBOXES ───────────────────
+  // Layout toggle enabled: `size: A4` without orientation lock
   const handlePrint = () => {
-    // Filter out unchecked rows
     const printableTxns = activeTxns.filter(t => !excludedRowIndices[t.index]);
     
     if (printableTxns.length === 0) {
@@ -697,422 +714,341 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
 
     const printChunks = chunkArray(printableTxns, 6);
 
-    const printFrame = document.createElement('iframe');
-    printFrame.name = 'nefc_print_iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
+    const printPagesHTML = printChunks.map((chunk, chunkIdx) => {
+      const paddedChunk = [...chunk];
+      while (paddedChunk.length < 6) {
+        paddedChunk.push({
+          index: paddedChunk.length + 1,
+          date: '--',
+          particulars: '--',
+          month: '--',
+          lateFees: '--',
+          amount: 0,
+          balance: 0,
+          type: '--',
+          isEmpty: true
+        } as any);
+      }
 
-    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-    if (frameDoc) {
-      const printPagesHTML = printChunks.map((chunk, chunkIdx) => {
-        // Pad with empty rows to exactly 6 rows to respect physical layout
-        const paddedChunk = [...chunk];
-        while (paddedChunk.length < 6) {
-          paddedChunk.push({
-            index: paddedChunk.length + 1,
-            date: '--',
-            particulars: '--',
-            month: '--',
-            lateFees: '--',
-            amount: 0,
-            balance: 0,
-            type: '--',
-            isEmpty: true
-          } as any);
-        }
-
-        return `
-          <div class="print-page-break">
-            <!-- Header section with Branch and Member title -->
-            <div class="header-container">
-              <div class="header-left">
-                <h1>${company.name}</h1>
-                <span>System Securities Division Ledger Booklet</span>
-              </div>
-              <div class="header-right">
-                <div>Branch: Mohan Nagar, Ghaziabad</div>
-                <div>Email: ${company.email}</div>
-                <div>Web: ${company.website}</div>
-              </div>
+      return `
+        <div class="print-page-break">
+          <div class="header-container">
+            <div class="header-left">
+              <h1>${company.name}</h1>
+              <span>System Securities Division Ledger Booklet</span>
             </div>
-
-            <!-- Policy details table matching id="policy_style" and .fd-policy exactly -->
-            <table id="policy_style" class="fd-policy">
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa; width: 25%;">Member Id</td>
-                <td style="width: 25%;">: ${member.id}</td>
-                <td style="font-weight: 600; background-color: #f7f9fa; width: 25%;">Policy No</td>
-                <td style="width: 25%;">: ${activeInv.id}</td>
-              </tr>
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Member Name</td>
-                <td>: ${member.name}</td>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Policy Opening Date</td>
-                <td>: ${activeInv.startDate}</td>
-              </tr>
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Address</td>
-                
-              </tr>
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Nominee Name</td>
-                
-              </tr>
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Plan</td>
-                <td>: ${activeInv.schemeId}</td>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Period</td>
-                <td>: ${activeInv.durationYears * 12} Months</td>
-              </tr>
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Policy Amount(INR)</td>
-                <td>: ${formatAmountRaw(activeInv.amount)}</td>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Total Payable Amount(INR)</td>
-                <td>: ${formatAmountRaw(isRDSelected ? activeInv.amount * activeInv.durationYears * 12 : activeInv.amount)}</td>
-              </tr>
-              <tr>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Maturity Date</td>
-                <td>: ${activeInv.maturityDate}</td>
-                <td style="font-weight: 600; background-color: #f7f9fa;">Maturity Amount(INR)</td>
-                <td>: ${formatAmountRaw(getMaturityAmount(activeInv))}</td>
-              </tr>
-            </table>
-
-            <!-- Installment entries ledger table matching .rd-ledger-list exactly -->
-            <div style="font-weight: bold; font-family: sans-serif; font-size: 13px; margin: 15px 0 5px 0; border-bottom: 2px solid #000; padding-bottom: 3px;">
-              Ledger Installment List &bull; Page ${chunkIdx + 1} of ${printChunks.length}
-            </div>
-            
-            <table class="rd-ledger-list">
-              <thead>
-                <tr>
-                  <th class="wwdate">Date</th>
-                  <th class="ww1">Particular</th>
-                  <th class="wwmonth">Installment for the month of</th>
-                  <th class="ww">Late Fees</th>
-                  <th class="wwlate">Installment</th>
-                  <th class="ww">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${paddedChunk.map((t) => {
-                  const isPadded = (t as any).isEmpty;
-                  return `
-                    <tr>
-                      <td class="wwdate" style="font-family: monospace;">${isPadded ? '--' : t.date}</td>
-                      <td class="ww1">${isPadded ? '--' : t.particulars}</td>
-                      <td class="wwmonth" style="font-style: italic;">${isPadded ? '--' : t.month}</td>
-                      <td class="ww">${isPadded ? '--' : t.lateFees}</td>
-                      <td class="wwlate" style="font-family: monospace; font-weight: bold;">
-                        ${isPadded ? '--' : formatAmountRaw(t.amount)}
-                      </td>
-                      <td class="ww" style="font-family: monospace; font-weight: bold;">
-                        ${isPadded ? '--' : formatAmountRaw(t.balance || t.amount)}
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-
-            <!-- Page indicators & sign-off fields -->
-            <div class="footer-container">
-              <div>
-                <div>Note: Computerized Ledger Record. Branch registry Mohan Nagar.</div>
-                <div>Account Ref Code: ${activeInv.id}</div>
-              </div>
-              <div class="seal-box">
-                BRANCH MANAGER SEAL & SIGN
-              </div>
+            <div class="header-right">
+              <div>Branch: Mohan Nagar, Ghaziabad</div>
+              <div>Email: ${company.email}</div>
+              <div>Web: ${company.website}</div>
             </div>
           </div>
-        `;
-      }).join('');
 
-      frameDoc.open();
-      frameDoc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>NEFC Ledger Printer - ${member.name}</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                margin: 10mm;
-                padding: 0;
-                background-color: white !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-              
-              .print-page-break {
-                page-break-after: always;
-                break-after: page;
-                margin-bottom: 30px;
-              }
-              
-              .print-page-break:last-child {
-                page-break-after: avoid;
-                break-after: avoid;
-                margin-bottom: 0;
-              }
+          <table id="policy_style" class="fd-policy">
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa; width: 25%;">Member Id</td>
+              <td style="width: 25%;">: ${member.id}</td>
+              <td style="font-weight: 600; background-color: #f7f9fa; width: 25%;">Policy No</td>
+              <td style="width: 25%;">: ${activeInv.id}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Member Name</td>
+              <td>: ${member.name}</td>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Policy Opening Date</td>
+              <td>: ${activeInv.startDate}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Address</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Nominee Name</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Plan</td>
+              <td>: ${activeInv.schemeId}</td>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Period</td>
+              <td>: ${activeInv.durationYears * 12} Months</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Policy Amount(INR)</td>
+              <td>: ${formatAmountRaw(activeInv.amount)}</td>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Total Payable Amount(INR)</td>
+              <td>: ${formatAmountRaw(isRDSelected ? activeInv.amount * activeInv.durationYears * 12 : activeInv.amount)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Maturity Date</td>
+              <td>: ${activeInv.maturityDate}</td>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Maturity Amount(INR)</td>
+              <td>: ${formatAmountRaw(getMaturityAmount(activeInv))}</td>
+            </tr>
+          </table>
 
-              /* Details Table */
-              .fd-policy {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 20px;
-                font-size: 13px;
-                border: 1px solid #000;
-              }
-              .fd-policy td {
-                padding: 6px 10px;
-                border: 1px solid #000;
-                vertical-align: middle;
-              }
-              
-              /* Ledger Table */
-              .rd-ledger-list {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 10px;
-                font-size: 13px;
-                border: 1px solid #000;
-              }
-              .rd-ledger-list th {
-                background-color: #000 !important;
-                color: #fff !important;
-                padding: 8px 10px;
-                border: 1px solid #000;
-                text-align: center;
-                font-weight: bold;
-              }
-              .rd-ledger-list td {
-                padding: 8px 10px;
-                border: 1px solid #000;
-                text-align: center;
-              }
+          <div style="font-weight: bold; font-family: sans-serif; font-size: 13px; margin: 15px 0 5px 0; border-bottom: 2px solid #000; padding-bottom: 3px;">
+            Ledger Installment List &bull; Page ${chunkIdx + 1} of ${printChunks.length}
+          </div>
+          
+          <table class="rd-ledger-list">
+            <thead>
+              <tr>
+                <th class="wwdate">Date</th>
+                <th class="ww1">Particular</th>
+                <th class="wwmonth">Installment for the month of</th>
+                <th class="ww">Late Fees</th>
+                <th class="wwlate">Installment</th>
+                <th class="ww">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paddedChunk.map((t) => {
+                const isPadded = (t as any).isEmpty;
+                return `
+                  <tr>
+                    <td class="wwdate" style="font-family: monospace;">${isPadded ? '--' : t.date}</td>
+                    <td class="ww1">${isPadded ? '--' : t.particulars}</td>
+                    <td class="wwmonth" style="font-style: italic;">${isPadded ? '--' : t.month}</td>
+                    <td class="ww">${isPadded ? '--' : t.lateFees}</td>
+                    <td class="wwlate" style="font-family: monospace; font-weight: bold;">
+                      ${isPadded ? '--' : formatAmountRaw(t.amount)}
+                    </td>
+                    <td class="ww" style="font-family: monospace; font-weight: bold;">
+                      ${isPadded ? '--' : formatAmountRaw(t.balance || t.amount)}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
 
-              /* Column widths matches original CSS */
-              .wwdate {
-                width: 15%;
-                text-align: center !important;
-              }
-              .ww1 {
-                width: 15%;
-                text-align: center !important;
-              }
-              .wwmonth {
-                width: 30%;
-                text-align: center !important;
-              }
-              .ww {
-                width: 12%;
-                text-align: right !important;
-              }
-              .wwlate {
-                width: 16%;
-                text-align: right !important;
-              }
+          <div class="footer-container">
+            <div>
+              <div>Note: Computerized Ledger Record. Branch registry Mohan Nagar.</div>
+              <div>Account Ref Code: ${activeInv.id}</div>
+            </div>
+            <div class="seal-box">
+              BRANCH MANAGER SEAL & SIGN
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
 
-              /* Setup styles */
-              .header-container {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-end;
-                border-bottom: 2px solid #000;
-                padding-bottom: 6px;
-                margin-bottom: 15px;
-              }
-              .header-left h1 {
-                font-size: 20px;
-                margin: 0;
-                font-weight: bold;
-                text-transform: uppercase;
-                letter-spacing: -0.5px;
-              }
-              .header-left span {
-                font-size: 9px;
-                letter-spacing: 0.8px;
-                color: #555;
-                font-weight: bold;
-              }
-              .header-right {
-                text-align: right;
-                font-size: 10px;
-                color: #444;
-                line-height: 1.3;
-              }
+    triggerIframePrint('nefc_print_iframe', `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>NEFC Ledger Printer - ${member.name}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 10mm;
+              padding: 0;
+              background-color: white !important;
+              color: black !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            
+            .print-page-break {
+              page-break-after: always;
+              break-after: page;
+              margin-bottom: 30px;
+            }
+            .print-page-break:last-child {
+              page-break-after: avoid;
+              break-after: avoid;
+              margin-bottom: 0;
+            }
 
-              .footer-container {
-                margin-top: 25px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                font-size: 10px;
-                color: #444;
-              }
-              .seal-box {
-                border: 1px solid #000;
-                padding: 12px 20px;
-                font-size: 9px;
-                font-weight: bold;
-                text-align: center;
-                border-radius: 4px;
-                background-color: #fff;
-              }
+            .fd-policy {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+              font-size: 13px;
+              border: 1px solid #000;
+            }
+            .fd-policy td {
+              padding: 6px 10px;
+              border: 1px solid #000;
+              vertical-align: middle;
+            }
+            
+            .rd-ledger-list {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              font-size: 13px;
+              border: 1px solid #000;
+            }
+            .rd-ledger-list th {
+              background-color: #000 !important;
+              color: #fff !important;
+              padding: 8px 10px;
+              border: 1px solid #000;
+              text-align: center;
+              font-weight: bold;
+            }
+            .rd-ledger-list td {
+              padding: 8px 10px;
+              border: 1px solid #000;
+              text-align: center;
+            }
 
-              @page {
-                size: A4 portrait;
-                margin: 0;
-              }
-            </style>
-          </head>
-          <body>
-            ${printPagesHTML}
-          </body>
-        </html>
-      `);
-      frameDoc.close();
+            .wwdate { width: 15%; text-align: center !important; }
+            .ww1    { width: 15%; text-align: center !important; }
+            .wwmonth{ width: 30%; text-align: center !important; }
+            .ww     { width: 12%; text-align: right !important; }
+            .wwlate { width: 16%; text-align: right !important; }
 
-      setTimeout(() => {
-        try {
-          printFrame.contentWindow?.focus();
-          printFrame.contentWindow?.print();
-        } catch (printErr) {
-          console.error('Frame printed invocation failure: ', printErr);
-        }
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1500);
-      }, 500);
-    }
+            .header-container {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              border-bottom: 2px solid #000;
+              padding-bottom: 6px;
+              margin-bottom: 15px;
+            }
+            .header-left h1 {
+              font-size: 20px;
+              margin: 0;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: -0.5px;
+            }
+            .header-left span {
+              font-size: 9px;
+              letter-spacing: 0.8px;
+              color: #555;
+              font-weight: bold;
+            }
+            .header-right {
+              text-align: right;
+              font-size: 10px;
+              color: #444;
+              line-height: 1.3;
+            }
+            .footer-container {
+              margin-top: 25px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 10px;
+              color: #444;
+            }
+            .seal-box {
+              border: 1px solid #000;
+              padding: 12px 20px;
+              font-size: 9px;
+              font-weight: bold;
+              text-align: center;
+              border-radius: 4px;
+              background-color: #fff;
+            }
+
+            /* ── Layout toggle fix: size: A4 without orientation lock ── */
+            @page {
+              size: A4;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          ${printPagesHTML}
+        </body>
+      </html>
+    `);
   };
 
-  // PRINT DETAILS ONLY (COVER PAGE)
+  // ─── PRINT DETAILS ONLY (COVER PAGE) ─────────────────────────────────────
+  // Layout toggle enabled: `size: A4` without orientation lock
   const handlePrintDetailsOnly = () => {
-    const printFrame = document.createElement('iframe');
-    printFrame.name = 'nefc_print_details_iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
-
-    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-    if (frameDoc) {
-      frameDoc.open();
-      frameDoc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>NEFC Details Printer - ${member.name}</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                margin: 20mm 15mm;
-                padding: 0;
-                background-color: white !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-              
-              .details-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 14px;
-                font-family: Arial, sans-serif;
-              }
-              .details-table td {
-                padding: 8px 10px;
-                vertical-align: top;
-              }
-              .lbl {
-                font-weight: bold;
-                width: 25%;
-                white-space: nowrap;
-              }
-              .val {
-                width: 25%;
-              }
-              @page {
-                size: A4 portrait;
-                margin: 0;
-              }
-            </style>
-          </head>
-          <body>
-            <table class="details-table">
-              <tr>
-                <td class="lbl">Member Id</td>
-                <td class="val">: ${member.id}</td>
-                <td class="lbl">Policy No</td>
-                <td class="val">: ${activeInv.id}</td>
-              </tr>
-              <tr>
-                <td class="lbl">Member Name</td>
-                <td class="val">: ${member.name}</td>
-                <td class="lbl">Policy Opening Date</td>
-                <td class="val">: ${activeInv.startDate}</td>
-              </tr>
-              <tr>
-                <td class="lbl">Address</td>
-                
-              </tr>
-              <tr>
-                <td class="lbl">Nominee Name</td>
-                
-              </tr>
-              <tr>
-                <td class="lbl">Plan</td>
-                <td class="val">: ${activeInv.schemeId}</td>
-                <td class="lbl">Period</td>
-                <td class="val">: ${activeInv.durationYears * 12} Months</td>
-              </tr>
-              <tr>
-                <td class="lbl">Policy Amount(INR)</td>
-                <td class="val">: ${formatAmountRaw(activeInv.amount)}</td>
-                <td class="lbl">Total Payable Amount(INR)</td>
-                <td class="val">: ${formatAmountRaw(isRDSelected ? activeInv.amount * activeInv.durationYears * 12 : activeInv.amount)}</td>
-              </tr>
-              <tr>
-                <td class="lbl">Maturity Date</td>
-                <td class="val">: ${activeInv.maturityDate}</td>
-                <td class="lbl">Maturity Amount(INR)</td>
-                <td class="val">: ${formatAmountRaw(getMaturityAmount(activeInv))}</td>
-              </tr>
-            </table>
-          </body>
-        </html>
-      `);
-      frameDoc.close();
-
-      setTimeout(() => {
-        try {
-          printFrame.contentWindow?.focus();
-          printFrame.contentWindow?.print();
-        } catch (printErr) {
-          console.error('Frame details printed invocation failure: ', printErr);
-        }
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1500);
-      }, 500);
-    }
+    triggerIframePrint('nefc_print_details_iframe', `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>NEFC Details Printer - ${member.name}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20mm 15mm;
+              padding: 0;
+              background-color: white !important;
+              color: black !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            
+            .details-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+              font-family: Arial, sans-serif;
+            }
+            .details-table td {
+              padding: 8px 10px;
+              vertical-align: top;
+            }
+            .lbl {
+              font-weight: bold;
+              width: 25%;
+              white-space: nowrap;
+            }
+            .val {
+              width: 25%;
+            }
+            /* ── Layout toggle fix: size: A4 without orientation lock ── */
+            @page {
+              size: A4;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <table class="details-table">
+            <tr>
+              <td class="lbl">Member Id</td>
+              <td class="val">: ${member.id}</td>
+              <td class="lbl">Policy No</td>
+              <td class="val">: ${activeInv.id}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Member Name</td>
+              <td class="val">: ${member.name}</td>
+              <td class="lbl">Policy Opening Date</td>
+              <td class="val">: ${activeInv.startDate}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Address</td>
+            </tr>
+            <tr>
+              <td class="lbl">Nominee Name</td>
+            </tr>
+            <tr>
+              <td class="lbl">Plan</td>
+              <td class="val">: ${activeInv.schemeId}</td>
+              <td class="lbl">Period</td>
+              <td class="val">: ${activeInv.durationYears * 12} Months</td>
+            </tr>
+            <tr>
+              <td class="lbl">Policy Amount(INR)</td>
+              <td class="val">: ${formatAmountRaw(activeInv.amount)}</td>
+              <td class="lbl">Total Payable Amount(INR)</td>
+              <td class="val">: ${formatAmountRaw(isRDSelected ? activeInv.amount * activeInv.durationYears * 12 : activeInv.amount)}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Maturity Date</td>
+              <td class="val">: ${activeInv.maturityDate}</td>
+              <td class="lbl">Maturity Amount(INR)</td>
+              <td class="val">: ${formatAmountRaw(getMaturityAmount(activeInv))}</td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `);
   };
 
-  // PRINT LEDGER PAGE ONLY (6 INSTALLMENTS)
+  // ─── PRINT LEDGER PAGE ONLY (6 INSTALLMENTS) ─────────────────────────────
+  // Layout toggle enabled: `size: A4` without orientation lock
   const handlePrintLedgerPageOnly = () => {
-    // Current visible page's chunk contains 6 items (activeChunk).
     const printableChunk = activeChunk.filter(t => !excludedRowIndices[t.index]);
 
     if (printableChunk.length === 0) {
@@ -1120,7 +1056,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
       return;
     }
 
-    // Replace excluded rows with empty rows to preserve physical line heights in passbook alignment
     const paddedChunk = activeChunk.map((t) => {
       const isExcluded = excludedRowIndices[t.index] === true;
       if (isExcluded) {
@@ -1137,213 +1072,126 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
       return t;
     });
 
-    const printFrame = document.createElement('iframe');
-    printFrame.name = 'nefc_print_ledger_page_iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
-
-    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-    if (frameDoc) {
-      frameDoc.open();
-      frameDoc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>NEFC Ledger Printer - Page ${currentPage}</title>
-            <style>
-              body {
-                font-family: 'Courier New', Courier, monospace;
-                font-size: 13px;
-                font-weight: bold;
-                margin: 20mm 15mm;
-                padding: 0;
-                background-color: white !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-              .ledger-table {
-                width: 100%;
-                border-collapse: collapse;
-                border: none;
-              }
-              .ledger-table td {
-                padding: 8px 0;
-                border: none;
-              }
-              .col-date {
-                width: 18%;
-                text-align: left;
-              }
-              .col-part {
-                width: 14%;
-                text-align: center;
-              }
-              .col-month {
-                width: 25%;
-                text-align: center;
-              }
-              .col-fees {
-                width: 11%;
-                text-align: center;
-              }
-              .col-inst {
-                width: 16%;
-                text-align: right;
-              }
-              .col-bal {
-                width: 16%;
-                text-align: right;
-              }
-              @page {
-                size: A4 portrait;
-                margin: 0;
-              }
-            </style>
-          </head>
-          <body>
-            <table class="ledger-table">
-              <tbody>
-                ${paddedChunk.map((t) => {
-                  const isPadded = (t as any).isEmpty;
-                  return `
-                    <tr>
-                      <td class="col-date">${isPadded ? '&nbsp;' : t.date}</td>
-                      <td class="col-part">${isPadded ? '&nbsp;' : t.particulars}</td>
-                      <td class="col-month">${isPadded ? '&nbsp;' : t.month}</td>
-                      <td class="col-fees">${isPadded ? '&nbsp;' : t.lateFees}</td>
-                      <td class="col-inst">${isPadded ? '&nbsp;' : formatAmountRaw(t.amount)}</td>
-                      <td class="col-bal">${isPadded ? '&nbsp;' : formatAmountRaw(t.balance || t.amount)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </body>
-        </html>
-      `);
-      frameDoc.close();
-
-      setTimeout(() => {
-        try {
-          printFrame.contentWindow?.focus();
-          printFrame.contentWindow?.print();
-        } catch (printErr) {
-          console.error('Frame ledger page print failure: ', printErr);
-        }
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1500);
-      }, 500);
-    }
+    triggerIframePrint('nefc_print_ledger_page_iframe', `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>NEFC Ledger Printer - Page ${currentPage}</title>
+          <style>
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 13px;
+              font-weight: bold;
+              margin: 20mm 15mm;
+              padding: 0;
+              background-color: white !important;
+              color: black !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .ledger-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none;
+            }
+            .ledger-table td {
+              padding: 8px 0;
+              border: none;
+            }
+            .col-date  { width: 18%; text-align: left; }
+            .col-part  { width: 14%; text-align: center; }
+            .col-month { width: 25%; text-align: center; }
+            .col-fees  { width: 11%; text-align: center; }
+            .col-inst  { width: 16%; text-align: right; }
+            .col-bal   { width: 16%; text-align: right; }
+            /* ── Layout toggle fix: size: A4 without orientation lock ── */
+            @page {
+              size: A4;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <table class="ledger-table">
+            <tbody>
+              ${paddedChunk.map((t) => {
+                const isPadded = (t as any).isEmpty;
+                return `
+                  <tr>
+                    <td class="col-date">${isPadded ? '&nbsp;' : t.date}</td>
+                    <td class="col-part">${isPadded ? '&nbsp;' : t.particulars}</td>
+                    <td class="col-month">${isPadded ? '&nbsp;' : t.month}</td>
+                    <td class="col-fees">${isPadded ? '&nbsp;' : t.lateFees}</td>
+                    <td class="col-inst">${isPadded ? '&nbsp;' : formatAmountRaw(t.amount)}</td>
+                    <td class="col-bal">${isPadded ? '&nbsp;' : formatAmountRaw(t.balance || t.amount)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
   };
 
-  // PRINT SINGLE ROW LEDGER LINE
+  // ─── PRINT SINGLE ROW LEDGER LINE ─────────────────────────────────────────
+  // Layout toggle enabled: `size: A4` without orientation lock
   const handlePrintSingleRow = (row: any) => {
-    const printFrame = document.createElement('iframe');
-    printFrame.name = 'nefc_print_row_iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
-
-    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-    if (frameDoc) {
-      frameDoc.open();
-      frameDoc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>NEFC Row Printer - Row ${row.index}</title>
-            <style>
-              body {
-                font-family: 'Courier New', Courier, monospace;
-                font-size: 13px;
-                font-weight: bold;
-                margin: 20mm 15mm;
-                padding: 0;
-                background-color: white !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-              .ledger-table {
-                width: 100%;
-                border-collapse: collapse;
-                border: none;
-              }
-              .ledger-table td {
-                padding: 8px 0;
-                border: none;
-              }
-              .col-date {
-                width: 18%;
-                text-align: left;
-              }
-              .col-part {
-                width: 14%;
-                text-align: center;
-              }
-              .col-month {
-                width: 25%;
-                text-align: center;
-              }
-              .col-fees {
-                width: 11%;
-                text-align: center;
-              }
-              .col-inst {
-                width: 16%;
-                text-align: right;
-              }
-              .col-bal {
-                width: 16%;
-                text-align: right;
-              }
-              @page {
-                size: A4 portrait;
-                margin: 0;
-              }
-            </style>
-          </head>
-          <body>
-            <table class="ledger-table">
-              <tbody>
-                <tr>
-                  <td class="col-date">${row.date}</td>
-                  <td class="col-part">${row.particulars}</td>
-                  <td class="col-month">${row.month}</td>
-                  <td class="col-fees">${row.lateFees}</td>
-                  <td class="col-inst">${formatAmountRaw(row.amount)}</td>
-                  <td class="col-bal">${formatAmountRaw(row.balance || row.amount)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </body>
-        </html>
-      `);
-      frameDoc.close();
-
-      setTimeout(() => {
-        try {
-          printFrame.contentWindow?.focus();
-          printFrame.contentWindow?.print();
-        } catch (printErr) {
-          console.error('Frame row print failure: ', printErr);
-        }
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1500);
-      }, 500);
-    }
+    triggerIframePrint('nefc_print_row_iframe', `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>NEFC Row Printer - Row ${row.index}</title>
+          <style>
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 13px;
+              font-weight: bold;
+              margin: 20mm 15mm;
+              padding: 0;
+              background-color: white !important;
+              color: black !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .ledger-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none;
+            }
+            .ledger-table td {
+              padding: 8px 0;
+              border: none;
+            }
+            .col-date  { width: 18%; text-align: left; }
+            .col-part  { width: 14%; text-align: center; }
+            .col-month { width: 25%; text-align: center; }
+            .col-fees  { width: 11%; text-align: center; }
+            .col-inst  { width: 16%; text-align: right; }
+            .col-bal   { width: 16%; text-align: right; }
+            /* ── Layout toggle fix: size: A4 without orientation lock ── */
+            @page {
+              size: A4;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <table class="ledger-table">
+            <tbody>
+              <tr>
+                <td class="col-date">${row.date}</td>
+                <td class="col-part">${row.particulars}</td>
+                <td class="col-month">${row.month}</td>
+                <td class="col-fees">${row.lateFees}</td>
+                <td class="col-inst">${formatAmountRaw(row.amount)}</td>
+                <td class="col-bal">${formatAmountRaw(row.balance || row.amount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
   };
 
   // Setup current on-screen page chunk representation
@@ -1366,7 +1214,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
   return (
     <div className="fixed inset-0 z-[60000] bg-slate-900/90 backdrop-blur-sm flex flex-col justify-center items-center p-2 sm:p-4 text-slate-800">
       
-      {/* Outer wrapper styled similarly to standard PDF tools */}
+      {/* Outer wrapper */}
       <div className="bg-slate-800 w-full max-w-5xl rounded-3xl overflow-hidden flex flex-col shadow-2xl h-[95vh] border border-slate-700">
         
         {/* TOP BAR / NAVIGATION TOOLBAR */}
@@ -1429,7 +1277,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               <span>Print Ledger Page (6 rows)</span>
             </button>
 
-            {/* Print button matching original styling */}
+            {/* Print Combined Statement */}
             <button
               onClick={handlePrint}
               className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
@@ -1461,7 +1309,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
           </div>
         </div>
 
-        {/* WORK RESERVoir AREA (Chrome-PDF simulation screen) */}
+        {/* WORK AREA */}
         <div className="flex-1 overflow-y-auto bg-slate-700/80 flex flex-col justify-start items-center p-3 sm:p-6 space-y-4 scrollbar-thin">
           
           {/* Simulated A4 Paper document */}
@@ -1485,7 +1333,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                 </div>
               </div>
 
-              {/* DETAILS TABLE replica matching old policy_style */}
+              {/* DETAILS TABLE */}
               <div className="overflow-x-auto">
                 <table id="policy_style" className="w-full border-collapse border border-slate-950 text-xs">
                   <tbody>
@@ -1503,11 +1351,9 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Address</td>
-                      
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Nominee Name</td>
-                      
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Plan</td>
@@ -1542,7 +1388,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                 </span>
               </div>
 
-              {/* RENDERED LEDGER ENTRIES TABLE (Exact column style matching old rd-ledger-list) */}
+              {/* RENDERED LEDGER ENTRIES TABLE */}
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-slate-950 text-xs text-center table-fixed">
                   <thead className="bg-[#111827] text-white font-bold h-10">
@@ -1566,7 +1412,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                       return (
                         <React.Fragment key={idx}>
                           <tr className={`border-b border-slate-300 hover:bg-slate-50 transition-colors ${isRowExcluded ? 'opacity-40 bg-slate-50/70 border-dashed line-through decoration-slate-400' : ''}`}>
-                            {/* Checkbox selector representing screen print selective controls */}
                             <td className="p-2 border border-slate-950 text-center">
                               {!isPadded && (
                                 <input
@@ -1589,7 +1434,6 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                             <td className="p-2 sm:p-2.5 border border-slate-950 text-right font-mono font-bold">
                               {isPadded ? '--' : formatAmountRaw(t.balance || t.amount)}
                             </td>
-                            {/* Actions Cell with Print Row option */}
                             <td className="p-1 sm:p-1.5 border border-slate-950 text-center select-none">
                               {!isPadded && (
                                 <div className="flex flex-col gap-1">
@@ -1616,13 +1460,12 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                             </td>
                           </tr>
 
-                          {/* NESTED ORIGINAL RENEWAL RECEIPT PREVIEW (Toggleable inline visually) */}
+                          {/* NESTED RENEWAL RECEIPT PREVIEW */}
                           {!isPadded && isReceiptOpen && (
                             <tr className="bg-slate-50 border border-slate-900 shadow-inner">
                               <td colSpan={8} className="p-4 sm:p-6 border border-slate-950">
                                 <div className="border border-slate-400 border-dashed rounded-xl p-4 bg-white shadow-md relative overflow-hidden">
                                   
-                                  {/* Absolute float button to fast print receipt */}
                                   <button
                                     onClick={() => handlePrintReceipt(t)}
                                     type="button"
