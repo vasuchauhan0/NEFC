@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { MemberService } from './service.ts';
+import jwt from 'jsonwebtoken';
 
 const service = new MemberService();
+const jwtSecret = process.env.JWT_SECRET as string;
 
 export class MemberController {
   async handleMembersAction(req: Request, res: Response): Promise<void> {
@@ -25,6 +27,45 @@ export class MemberController {
       }
     } catch (error) {
       res.status(500).json({ error: 'Failed to complete member management action' });
+    }
+  }
+
+  // Returns fresh member data for the logged-in member using their JWT
+  async getMe(req: Request, res: Response): Promise<void> {
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+      if (!token) {
+        res.status(401).json({ error: 'Missing member token.' });
+        return;
+      }
+
+      let payload: any;
+      try {
+        payload = jwt.verify(token, jwtSecret);
+      } catch {
+        res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
+        return;
+      }
+
+      const members = await service.getAllMembers();
+      const member = members.find(m => m.id === payload.id);
+
+      if (!member) {
+        res.status(404).json({ error: 'Member account not found.' });
+        return;
+      }
+
+      if (member.status !== 'Active') {
+        res.status(403).json({ error: 'Member account is suspended.' });
+        return;
+      }
+
+      const { password, ...safeMember } = member as any;
+      res.json({ success: true, member: safeMember });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch member data.' });
     }
   }
 }

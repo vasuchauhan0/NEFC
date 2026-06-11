@@ -10,6 +10,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY!
 );
 
+export { supabase };
+
 const settingKeys = ['adminPass', 'company', 'hero', 'announcement', 'stats', 'steps', 'trust'] as const;
 
 // ─── Helper: load all site_settings ──────────────────────────────────────────
@@ -92,6 +94,10 @@ export async function getDatabase(): Promise<SiteData> {
 }
 
 // ─── saveDatabase ─────────────────────────────────────────────────────────────
+// NOTE: This function only upserts settings, schemes, members, and investments.
+// It does NOT delete anything. Deletions must be done explicitly via the
+// direct helper functions below. This prevents race conditions where a
+// stale in-memory snapshot accidentally deletes records added by other requests.
 export async function saveDatabase(data: SiteData): Promise<void> {
 
   // Upsert settings
@@ -100,50 +106,38 @@ export async function saveDatabase(data: SiteData): Promise<void> {
   );
 
   // Upsert schemes
-  await supabase.from('schemes').upsert(
-    data.schemes.map((s: any) => ({
-      id: s.id,
-      type: s.type,
-      duration_years: s.durationYears,
-      interest_pct: s.interestPct,
-      maturity_amount_preview: s.maturityAmountPreview,
-      status: s.status,
-    }))
-  );
-
-  // Delete removed schemes
-  const schemeIds = data.schemes.map((s: any) => s.id);
-  if (schemeIds.length > 0) {
-    await supabase.from('schemes').delete().not('id', 'in', `(${schemeIds.map((id: string) => `"${id}"`).join(',')})`);
-  } else {
-    await supabase.from('schemes').delete().neq('id', '');
+  if (data.schemes.length > 0) {
+    await supabase.from('schemes').upsert(
+      data.schemes.map((s: any) => ({
+        id: s.id,
+        type: s.type,
+        duration_years: s.durationYears,
+        interest_pct: s.interestPct,
+        maturity_amount_preview: s.maturityAmountPreview,
+        status: s.status,
+      }))
+    );
   }
 
   // Upsert members
-  await supabase.from('members').upsert(
-    data.members.map((m: any) => ({
-      id: m.id,
-      name: m.name,
-      email: m.email,
-      phone: m.phone,
-      city: m.city,
-      password: m.password,
-      status: m.status,
-      member_since: m.memberSince,
-      father_name: m.fatherName ?? null,
-      aadhar_number: m.aadharNumber ?? null,
-      pan_number: m.panNumber ?? null,
-      nominee_name: m.nomineeName ?? null,
-      nominee_relation: m.nomineeRelation ?? null,
-    }))
-  );
-
-  // Delete removed members
-  const memberIds = data.members.map((m: any) => m.id);
-  if (memberIds.length > 0) {
-    await supabase.from('members').delete().not('id', 'in', `(${memberIds.map((id: string) => `"${id}"`).join(',')})`);
-  } else {
-    await supabase.from('members').delete().neq('id', '');
+  if (data.members.length > 0) {
+    await supabase.from('members').upsert(
+      data.members.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        phone: m.phone,
+        city: m.city,
+        password: m.password,
+        status: m.status,
+        member_since: m.memberSince,
+        father_name: m.fatherName ?? null,
+        aadhar_number: m.aadharNumber ?? null,
+        pan_number: m.panNumber ?? null,
+        nominee_name: m.nomineeName ?? null,
+        nominee_relation: m.nomineeRelation ?? null,
+      }))
+    );
   }
 
   // Upsert investments
@@ -163,14 +157,6 @@ export async function saveDatabase(data: SiteData): Promise<void> {
     }))
   );
 
-  // Delete removed investments
-  const investmentIds = allInvestments.map((i: any) => i.id);
-  if (investmentIds.length > 0) {
-    await supabase.from('member_investments').delete().not('id', 'in', `(${investmentIds.map((id: string) => `"${id}"`).join(',')})`);
-  } else {
-    await supabase.from('member_investments').delete().neq('id', '');
-  }
-
   if (allInvestments.length > 0) {
     await supabase.from('member_investments').upsert(allInvestments);
   }
@@ -189,14 +175,25 @@ export async function saveDatabase(data: SiteData): Promise<void> {
       }))
     );
   }
+}
 
-  // Delete removed messages
-  const messageIds = data.messages.map((m: any) => m.id);
-  if (messageIds.length > 0) {
-    await supabase.from('contact_messages').delete().not('id', 'in', `(${messageIds.map((id: string) => `"${id}"`).join(',')})`);
-  } else {
-    await supabase.from('contact_messages').delete().neq('id', '');
-  }
+// ─── Direct delete helpers (use these instead of snapshot-based deletes) ─────
+
+export async function deleteMemberById(id: string): Promise<void> {
+  await supabase.from('member_investments').delete().eq('member_id', id);
+  await supabase.from('members').delete().eq('id', id);
+}
+
+export async function deleteSchemeById(id: string): Promise<void> {
+  await supabase.from('schemes').delete().eq('id', id);
+}
+
+export async function deleteInvestmentById(investmentId: string): Promise<void> {
+  await supabase.from('member_investments').delete().eq('id', investmentId);
+}
+
+export async function deleteMessageById(id: string): Promise<void> {
+  await supabase.from('contact_messages').delete().eq('id', id);
 }
 
 // ─── getDatabasePath (legacy compat) ─────────────────────────────────────────

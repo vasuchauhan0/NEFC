@@ -1,4 +1,4 @@
-import { getDatabase, saveDatabase } from '../../shared/utils/db.ts';
+import { getDatabase, saveDatabase, deleteMemberById, deleteInvestmentById } from '../../shared/utils/db.ts';
 import { Member, MemberInvestment } from '../../shared/types/index.ts';
 
 export class MemberRepository {
@@ -15,7 +15,7 @@ export class MemberRepository {
   async save(member: Member): Promise<Member[]> {
     const data = await getDatabase();
     const existingIdx = data.members.findIndex(m => m.id === member.id);
-    
+
     if (existingIdx !== -1) {
       data.members[existingIdx] = {
         ...data.members[existingIdx],
@@ -36,10 +36,9 @@ export class MemberRepository {
   }
 
   async delete(id: string): Promise<Member[]> {
-    const data = await getDatabase();
-    data.members = data.members.filter(m => m.id !== id);
-    await saveDatabase(data);
-    return data.members;
+    // Direct targeted delete — does NOT touch other members
+    await deleteMemberById(id);
+    return this.getAll();
   }
 
   async addInvestment(memberId: string, investment: Omit<MemberInvestment, 'id'>): Promise<Member[]> {
@@ -57,12 +56,8 @@ export class MemberRepository {
   }
 
   async deleteInvestment(memberId: string, investmentId: string): Promise<Member[]> {
-    const data = await getDatabase();
-    const mem = data.members.find(m => m.id === memberId);
-    if (mem) {
-      mem.investments = (mem.investments || []).filter(i => i.id !== investmentId);
-      await saveDatabase(data);
-    }
-    return data.members;
+    // Direct targeted delete — does NOT touch other investments or members
+    await deleteInvestmentById(investmentId);
+    return this.getAll();
   }
 }

@@ -1,4 +1,4 @@
-import { getDatabase, saveDatabase } from '../../shared/utils/db.ts';
+import { getDatabase, saveDatabase, deleteMessageById } from '../../shared/utils/db.ts';
 import { ContactMessage } from '../../shared/types/index.ts';
 
 export class ContactRepository {
@@ -36,8 +36,7 @@ export class ContactRepository {
   }
 
   async deleteMessage(id: string): Promise<void> {
-    const data = await getDatabase();
-    data.messages = (data.messages || []).filter(m => m.id !== id);
-    await saveDatabase(data);
+    // Direct targeted delete — does NOT touch other messages
+    await deleteMessageById(id);
   }
 }

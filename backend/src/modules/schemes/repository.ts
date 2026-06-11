@@ -1,4 +1,4 @@
-import { getDatabase, saveDatabase } from '../../shared/utils/db.ts';
+import { getDatabase, saveDatabase, deleteSchemeById } from '../../shared/utils/db.ts';
 import { InvestmentScheme } from '../../shared/types/index.ts';
 
 export class SchemeRepository {
@@ -22,10 +22,9 @@ export class SchemeRepository {
   }
 
   async delete(id: string): Promise<InvestmentScheme[]> {
-    const data = await getDatabase();
-    data.schemes = data.schemes.filter(s => s.id !== id);
-    await saveDatabase(data);
-    return data.schemes;
+    // Direct targeted delete — does NOT touch other schemes
+    await deleteSchemeById(id);
+    return this.getAll();
   }
 
   async updateBulkRates(rates: Record<string, { interestPct: number; maturityAmountPreview: number }>): Promise<InvestmentScheme[]> {
