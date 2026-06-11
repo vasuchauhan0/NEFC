@@ -63,6 +63,12 @@ export interface Member {
   status: 'Active' | 'Inactive';
   memberSince: string;
   investments: MemberInvestment[];
+  // KYC Details
+  fatherName?: string;
+  aadharNumber?: string;
+  panNumber?: string;
+  nomineeName?: string;
+  nomineeRelation?: string;
 }
 
 export interface ContactMessage {
@@ -70,6 +76,7 @@ export interface ContactMessage {
   name: string;
   contact: string;
   subject: string;
+  phone?: string;
   message: string;
   date: string;
   read: boolean;

@@ -57,6 +57,11 @@ export async function getDatabase(): Promise<SiteData> {
     password: r.password,
     status: r.status,
     memberSince: r.member_since,
+    fatherName: r.father_name ?? undefined,
+    aadharNumber: r.aadhar_number ?? undefined,
+    panNumber: r.pan_number ?? undefined,
+    nomineeName: r.nominee_name ?? undefined,
+    nomineeRelation: r.nominee_relation ?? undefined,
     investments: (investmentsRes.data || [])
       .filter((i: any) => i.member_id === r.id)
       .map((i: any) => ({
@@ -125,6 +130,11 @@ export async function saveDatabase(data: SiteData): Promise<void> {
       password: m.password,
       status: m.status,
       member_since: m.memberSince,
+      father_name: m.fatherName ?? null,
+      aadhar_number: m.aadharNumber ?? null,
+      pan_number: m.panNumber ?? null,
+      nominee_name: m.nomineeName ?? null,
+      nominee_relation: m.nomineeRelation ?? null,
     }))
   );
 

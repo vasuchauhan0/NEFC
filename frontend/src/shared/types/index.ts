@@ -64,15 +64,22 @@ export interface Member {
   status: 'Active' | 'Inactive';
   memberSince: string; // Format e.g., "June 2024" or date string
   investments: MemberInvestment[];
+  // KYC Details
+  fatherName?: string;
+  aadharNumber?: string;
+  panNumber?: string;
+  nomineeName?: string;
+  nomineeRelation?: string;
 }
 
 export interface ContactMessage {
   id: string;
   name: string;
   contact: string;
+  phone?: string;
   subject: string;
   message: string;
-  date: string; // ISO timestamp
+  date: string;
   read: boolean;
 }
 

@@ -345,6 +345,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     const mPass = fd.get('password') as string;
     const mStatus = fd.get('status') as Member['status'];
     const mMemberSince = fd.get('memberSince') as string;
+    const mFatherName = fd.get('fatherName') as string;
+    const mAadhar = fd.get('aadharNumber') as string;
+    const mPan = fd.get('panNumber') as string;
+    const mNomineeName = fd.get('nomineeName') as string;
+    const mNomineeRelation = fd.get('nomineeRelation') as string;
 
     if (!mId || !mName || !mEmail) {
       triggerToast('Fill in all key credentials', 'error');
@@ -370,7 +375,12 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       password: mPass || 'nefc@123',
       status: mStatus,
       memberSince: mMemberSince || selectedMember?.memberSince || new Date().toISOString().split('T')[0],
-      investments: selectedMember?.investments || []
+      investments: selectedMember?.investments || [],
+      fatherName: mFatherName || undefined,
+      aadharNumber: mAadhar || undefined,
+      panNumber: mPan || undefined,
+      nomineeName: mNomineeName || undefined,
+      nomineeRelation: mNomineeRelation || undefined,
     };
 
     if (selectedMember) {
@@ -2333,6 +2343,78 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 </div>
               </div>
 
+              {/* KYC Details Section */}
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-wider">KYC Details</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Father's Name</label>
+                    <input
+                      type="text"
+                      name="fatherName"
+                      defaultValue={selectedMember?.fatherName || ''}
+                      className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-medium"
+                      placeholder="Ramesh Sharma"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Aadhaar Number</label>
+                      <input
+                        type="text"
+                        name="aadharNumber"
+                        defaultValue={selectedMember?.aadharNumber || ''}
+                        maxLength={12}
+                        className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-mono"
+                        placeholder="XXXXXXXXXXXX"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">PAN Number</label>
+                      <input
+                        type="text"
+                        name="panNumber"
+                        defaultValue={selectedMember?.panNumber || ''}
+                        maxLength={10}
+                        style={{ textTransform: 'uppercase' }}
+                        className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-mono"
+                        placeholder="ABCDE1234F"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nominee Name</label>
+                      <input
+                        type="text"
+                        name="nomineeName"
+                        defaultValue={selectedMember?.nomineeName || ''}
+                        className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-medium"
+                        placeholder="Sunita Sharma"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nominee Relation</label>
+                      <select
+                        name="nomineeRelation"
+                        defaultValue={selectedMember?.nomineeRelation || ''}
+                        className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-semibold"
+                      >
+                        <option value="">Select...</option>
+                        <option value="Spouse">Spouse</option>
+                        <option value="Son">Son</option>
+                        <option value="Daughter">Daughter</option>
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                        <option value="Brother">Brother</option>
+                        <option value="Sister">Sister</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-4">
                 <button
                   type="button"
@@ -2637,6 +2719,37 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       </span>
                     </div>
                   </div>
+
+                  {/* KYC Details */}
+                  {(detailMember.fatherName || detailMember.aadharNumber || detailMember.panNumber || detailMember.nomineeName) && (
+                    <div className="mt-4 space-y-2 border border-slate-100 rounded-2xl p-3">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">KYC Details</p>
+                      {detailMember.fatherName && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-bold uppercase text-[9px]">Father's Name</span>
+                          <span className="font-semibold text-slate-700">{detailMember.fatherName}</span>
+                        </div>
+                      )}
+                      {detailMember.aadharNumber && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-bold uppercase text-[9px]">Aadhaar</span>
+                          <span className="font-semibold text-slate-700 font-mono">{'••••••••'}{detailMember.aadharNumber.slice(-4)}</span>
+                        </div>
+                      )}
+                      {detailMember.panNumber && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-bold uppercase text-[9px]">PAN</span>
+                          <span className="font-semibold text-slate-700 font-mono">{detailMember.panNumber.toUpperCase()}</span>
+                        </div>
+                      )}
+                      {detailMember.nomineeName && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-bold uppercase text-[9px]">Nominee</span>
+                          <span className="font-semibold text-slate-700">{detailMember.nomineeName}{detailMember.nomineeRelation ? ` (${detailMember.nomineeRelation})` : ''}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Member Profile Actions Inside Modal */}
                   <div className="flex gap-2 mt-4">
@@ -3069,4 +3182,3 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     </div>
   );
 }
-
