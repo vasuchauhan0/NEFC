@@ -113,6 +113,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   const [instalmentsPage, setInstalmentsPage] = useState<number>(1);
   const [instalmentsSearch, setInstalmentsSearch] = useState<string>('');
 
+  // Pagination state for local registered members list
+  const [membersPage, setMembersPage] = useState<number>(1);
+
   // Synchronize state with current data
   React.useEffect(() => {
     if (siteData && safeData.schemes) {
@@ -1257,123 +1260,190 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
           )}
 
           {/* TAB 2: MEMBERS DIRECTORY SECTION */}
-          {activeTab === 'members' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <input
-                    type="text"
-                    value={memberSearch}
-                    onChange={(e) => setMemberSearch(e.target.value)}
-                    className="px-4 py-2 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:border-blue-500 w-64 shadow-xs"
-                    placeholder="Search query (name, ID)..."
-                  />
-                  <select
-                    value={memberFilter}
-                    onChange={(e) => setMemberFilter(e.target.value)}
-                    className="px-3 py-2 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:border-blue-500"
+          {activeTab === 'members' && (() => {
+            const itemsPerPage = 10;
+            const totalItems = filteredMembers.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+            const currentPage = Math.max(1, Math.min(membersPage, totalPages));
+            const paginatedMembers = filteredMembers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+            // Calculate pagination window pages (up to 5 page numbers)
+            const pages: number[] = [];
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+              startPage = Math.max(1, endPage - 4);
+            }
+            for (let i = startPage; i <= endPage; i++) {
+              pages.push(i);
+            }
+
+            return (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      value={memberSearch}
+                      onChange={(e) => {
+                        setMemberSearch(e.target.value);
+                        setMembersPage(1); // Reset to first page
+                      }}
+                      className="px-4 py-2 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:border-blue-500 w-64 shadow-xs"
+                      placeholder="Search query (name, ID)..."
+                    />
+                    <select
+                      value={memberFilter}
+                      onChange={(e) => {
+                        setMemberFilter(e.target.value);
+                        setMembersPage(1); // Reset to first page
+                      }}
+                      className="px-3 py-2 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:border-blue-500"
+                    >
+                      <option value="">All Statuses Models</option>
+                      <option value="Active">Active Models Only</option>
+                      <option value="Inactive">Suspended Accounts Only</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleOpenAddMember}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1 text-sm shadow-xs transition-transform"
                   >
-                    <option value="">All Statuses Models</option>
-                    <option value="Active">Active Models Only</option>
-                    <option value="Inactive">Suspended Accounts Only</option>
-                  </select>
+                    <PlusCircle size={16} />
+                    Register New Member
+                  </button>
                 </div>
 
-                <button
-                  onClick={handleOpenAddMember}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1 text-sm shadow-xs transition-transform"
-                >
-                  <PlusCircle size={16} />
-                  Register New Member
-                </button>
-              </div>
-
-              {/* Members table list */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500">Member ID</th>
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500">Profile Name</th>
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500">Contact Channels</th>
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500">City</th>
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500">Ledge Items</th>
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500">System Access</th>
-                        <th className="py-3 px-4 font-semibold uppercase text-slate-500 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-150">
-                      {filteredMembers.map((m) => {
-                        const mInvests = m.investments || [];
-                        return (
-                          <tr 
-                            key={m.id} 
-                            onClick={() => {
-                              setSelectedDetailMemberId(m.id);
-                              setActiveInvestmentSubTab('fd');
-                            }}
-                            className="hover:bg-slate-50 cursor-pointer transition-colors"
-                          >
-                            <td className="py-4 px-4 font-mono font-bold text-slate-800 text-xs">{m.id}</td>
-                            <td className="py-4 px-4 font-semibold text-slate-900">{m.name}</td>
-                            <td className="py-4 px-4">
-                              <div className="flex flex-col gap-0.5">
-                                <span className="font-semibold text-slate-700">{m.email}</span>
-                                <span className="text-slate-400 font-mono text-[10px]">{m.phone}</span>
-                              </div>
-                            </td>
-                            <td className="py-4 px-4 text-slate-600">{m.city}</td>
-                            <td className="py-4 px-4">
-                              <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded text-xs">
-                                {mInvests.length} Active Plan
-                              </span>
-                            </td>
-                            <td className="py-4 px-4">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                              }`}>
-                                {m.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex justify-end gap-1.5 items-center">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenEditMember(m);
-                                  }}
-                                  className="text-slate-600 hover:text-blue-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                  title="Edit member details"
-                                >
-                                  <Edit size={14} />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteMember(m.id);
-                                  }}
-                                  className="text-slate-400 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                  title="Delete member from registry"
-                                >
-                                  <Trash size={14} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {filteredMembers.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">No members registry found.</td>
+                {/* Members table list */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500">Member ID</th>
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500">Profile Name</th>
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500">Contact Channels</th>
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500">City</th>
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500">Ledge Items</th>
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500">System Access</th>
+                          <th className="py-3 px-4 font-semibold uppercase text-slate-500 text-right">Actions</th>
                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-150">
+                        {paginatedMembers.map((m) => {
+                          const mInvests = m.investments || [];
+                          return (
+                            <tr 
+                              key={m.id} 
+                              onClick={() => {
+                                setSelectedDetailMemberId(m.id);
+                                setActiveInvestmentSubTab('fd');
+                              }}
+                              className="hover:bg-slate-50 cursor-pointer transition-colors"
+                            >
+                              <td className="py-4 px-4 font-mono font-bold text-slate-800 text-xs">{m.id}</td>
+                              <td className="py-4 px-4 font-semibold text-slate-900">{m.name}</td>
+                              <td className="py-4 px-4">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-semibold text-slate-700">{m.email}</span>
+                                  <span className="text-slate-400 font-mono text-[10px]">{m.phone}</span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-slate-600">{m.city}</td>
+                              <td className="py-4 px-4">
+                                <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded text-xs">
+                                  {mInvests.length} Active Plan
+                                </span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {m.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex justify-end gap-1.5 items-center">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditMember(m);
+                                    }}
+                                    className="text-slate-600 hover:text-blue-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Edit member details"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMember(m.id);
+                                    }}
+                                    className="text-slate-400 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete member from registry"
+                                  >
+                                    <Trash size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {paginatedMembers.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">No members registry found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer */}
+                  {totalPages > 1 && (
+                    <div className="bg-slate-50 border-t border-slate-200 text-slate-600 flex items-center justify-center gap-6 py-4 px-6 select-none shadow-xs">
+                      {currentPage > 1 && (
+                        <button
+                          onClick={() => setMembersPage(currentPage - 1)}
+                          className="font-bold text-xs text-slate-700 hover:text-blue-600 active:scale-95 transition-all cursor-pointer tracking-wider uppercase border border-slate-200 px-3.5 py-1.5 rounded-xl bg-white shadow-xs hover:border-slate-300"
+                        >
+                          Prev
+                        </button>
                       )}
-                    </tbody>
-                  </table>
+
+                      <div className="flex items-center gap-2 text-sm font-bold">
+                        {pages.map(p => {
+                          const isActive = p === currentPage;
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => setMembersPage(p)}
+                              className={`relative flex items-center justify-center h-8 w-8 rounded-xl cursor-pointer transition-all ${
+                                isActive 
+                                  ? 'bg-blue-600 text-white shadow-xs font-bold' 
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent'
+                              }`}
+                            >
+                              <span className="text-xs">{p}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {currentPage < totalPages && (
+                        <button
+                          onClick={() => setMembersPage(currentPage + 1)}
+                          className="font-bold text-xs text-slate-700 hover:text-blue-600 active:scale-95 transition-all cursor-pointer tracking-wider uppercase border border-slate-200 px-3.5 py-1.5 rounded-xl bg-white shadow-xs hover:border-slate-300"
+                        >
+                          Next
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 3: SCHEME MODEL CONFIGS */}
           {activeTab === 'schemes' && (
