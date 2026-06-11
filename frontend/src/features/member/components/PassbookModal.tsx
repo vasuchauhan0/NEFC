@@ -347,13 +347,15 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
     doc.setFont('Helvetica', 'bold');
     doc.text('Nominee Name:', 20, 118);
     doc.setFont('Helvetica', 'normal');
+    doc.text(member.nomineeName ? `${member.nomineeName} (${member.nomineeRelation || 'N/A'})` : 'N/A', 55, 118);
     doc.setFont('Helvetica', 'bold');
     doc.text('Member Since:', 110, 118);
     doc.setFont('Helvetica', 'normal');
     doc.text(member.memberSince || 'N/A', 145, 118);
     doc.setFont('Helvetica', 'bold');
-    doc.text('Address:', 20, 128);
+    doc.text('Address / City:', 20, 128);
     doc.setFont('Helvetica', 'normal');
+    doc.text(member.city || 'N/A', 55, 128);
     doc.setFont('Helvetica', 'bold');
     doc.text('Account Status:', 110, 146);
     doc.setFont('Helvetica', 'bold');
@@ -473,7 +475,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
           doc.setFillColor(248, 250, 252);
           doc.rect(15, yOffset, 180, 8, 'F');
         }
-        doc.setDrawColor(241, 145, 249);
+        doc.setDrawColor(226, 232, 240);
         doc.line(15, yOffset + 8, 195, yOffset + 8);
         doc.setTextColor(TEXT_MAIN[0], TEXT_MAIN[1], TEXT_MAIN[2]);
         doc.text(String(row.index), 21, yOffset + 5.5);
@@ -664,10 +666,10 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               <td>: ${activeInv.startDate}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; background-color: #f7f9fa;">Address</td>
-            </tr>
-            <tr>
+              <td style="font-weight: 600; background-color: #f7f9fa;">Address / City</td>
+              <td>: ${member.city || 'N/A'}</td>
               <td style="font-weight: 600; background-color: #f7f9fa;">Nominee Name</td>
+              <td>: ${member.nomineeName ? `${member.nomineeName} (${member.nomineeRelation || 'N/A'})` : 'N/A'}</td>
             </tr>
             <tr>
               <td style="font-weight: 600; background-color: #f7f9fa;">Plan</td>
@@ -909,10 +911,10 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
               <td class="val">: ${activeInv.startDate}</td>
             </tr>
             <tr>
-              <td class="lbl">Address</td>
-            </tr>
-            <tr>
+              <td class="lbl">Address / City</td>
+              <td class="val">: ${member.city || 'N/A'}</td>
               <td class="lbl">Nominee Name</td>
+              <td class="val">: ${member.nomineeName ? `${member.nomineeName} (${member.nomineeRelation || 'N/A'})` : 'N/A'}</td>
             </tr>
             <tr>
               <td class="lbl">Plan</td>
@@ -1137,7 +1139,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
             {/* Print Details Only Button */}
             <button
               onClick={handlePrintDetailsOnly}
-              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-700"
               title="Print only customer and policy details cover page"
             >
               <BookOpen size={14} className="text-amber-400" />
@@ -1146,7 +1148,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
             {/* Print Ledger Page Only Button */}
             <button
               onClick={handlePrintLedgerPageOnly}
-              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-700"
               title="Print only active page of 6 installments"
             >
               <Printer size={14} className="text-emerald-400" />
@@ -1155,7 +1157,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
             {/* Print Combined Statement */}
             <button
               onClick={handlePrint}
-              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-750"
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 font-bold border border-slate-700"
               title="Print combined details with ledger list"
             >
               <Printer size={14} className="text-blue-400" />
@@ -1219,10 +1221,10 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                       <td className="p-2 sm:p-2.5">: {activeInv.startDate}</td>
                     </tr>
                     <tr className="border-b border-slate-950">
-                      <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Address</td>
-                    </tr>
-                    <tr className="border-b border-slate-950">
-                      <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Nominee Name</td>
+                      <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950 w-1/4">Address / City</td>
+                      <td className="p-2 sm:p-2.5 border-r border-slate-950 w-1/4">: {member.city || 'N/A'}</td>
+                      <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950 w-1/4">Nominee Name</td>
+                      <td className="p-2 sm:p-2.5 w-1/4">: {member.nomineeName ? `${member.nomineeName} (${member.nomineeRelation || 'N/A'})` : 'N/A'}</td>
                     </tr>
                     <tr className="border-b border-slate-950">
                       <td className="p-2 sm:p-2.5 font-bold bg-slate-100 border-r border-slate-950">Plan</td>
@@ -1251,7 +1253,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
                   <span className="bg-slate-900 text-white w-2 h-2 rounded-full"></span>
                   Ledger Installment List
                 </span>
-                <span className="text-[10px] font-bold text-slate-550 uppercase">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">
                   Sheet Page {currentPage} of {totalSimPages} &bull; <span className="text-blue-600 font-extrabold">Check box to selectively print</span>
                 </span>
               </div>
