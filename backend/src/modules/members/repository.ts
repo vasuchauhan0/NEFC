@@ -48,7 +48,7 @@ export class MemberRepository {
       if (!mem.investments) mem.investments = [];
       mem.investments.unshift({
         ...investment,
-        id: `INV-${Date.now()}`
+        id: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       } as MemberInvestment);
       await saveDatabase(data);
     }

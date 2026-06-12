@@ -16,7 +16,6 @@ import {
   Edit, 
   Trash, 
   Download, 
-  Upload, 
   ShieldAlert, 
   Sparkles, 
   PlusCircle, 
@@ -751,38 +750,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     await handleSaveData(updated, 'Corporate registry details updated');
   };
 
-  // BACKUP OPERATIONS (JSON)
-  const handleBackupExport = () => {
-    const name = `nefc_backup_${new Date().toISOString().split('T')[0]}.json`;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(siteData, null, 2));
-    const dlAnchor = document.createElement('a');
-    dlAnchor.setAttribute("href", dataStr);
-    dlAnchor.setAttribute("download", name);
-    document.body.appendChild(dlAnchor);
-    dlAnchor.click();
-    dlAnchor.remove();
-    triggerToast('JSON export downloaded successfully');
-  };
 
-  const handleBackupReset = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Restore Factory Defaults',
-      message: 'WARNING: Proceeding will wipe out all custom registers, member directories, and layout texts. Restore factory defaults?',
-      onConfirm: async () => {
-        try {
-          const res = await fetch('/api/data/reset', { method: 'POST' });
-          const clean = await res.json();
-          await onUpdateData(clean);
-          triggerToast('System database reset to defaults', 'success');
-          window.location.reload();
-        } catch (e) {
-          triggerToast('Reset fail', 'error');
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
 
   const handleMessageDelete = (id: string) => {
     setConfirmModal({
@@ -2328,83 +2296,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
             </div>
           )}
 
-          {/* TAB 7: WIPE & SYSTEMS RECOVERY */}
-          {activeTab === 'settings' && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
-                <h4 className="font-serif text-base text-slate-900 font-bold pb-2 border-b border-slate-100 flex items-center gap-1.5">
-                  <Settings size={18} />
-                  Database backups exporter / importer
-                </h4>
-                <p className="text-slate-500 text-xs leading-normal">
-                  Download overall database state registers as a solid JSON backup sheet. You can restore this file at any time.
-                </p>
+            
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleBackupExport}
-                    className="bg-blue-700 hover:bg-blue-800 text-white font-medium text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1"
-                  >
-                    <Download size={13} />
-                    Download JSON Backup
-                  </button>
-
-                  <label className="bg-white border border-slate-250 text-slate-700 hover:bg-slate-50 font-medium text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1">
-                    <Upload size={13} />
-                    Restore Backup Sheet
-                    <input
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = async (event) => {
-                          try {
-                            const resJson = JSON.parse(event.target?.result as string);
-                            if (resJson.adminPass && resJson.company && Array.isArray(resJson.members)) {
-                              const res = await fetch('/api/data/import', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(resJson)
-                              });
-                              const saved = await res.json();
-                              await onUpdateData(saved);
-                              triggerToast('Data backup fully restored!', 'success');
-                              setTimeout(() => window.location.reload(), 1000);
-                            } else {
-                              triggerToast('Invalid backup file shape!', 'error');
-                            }
-                          } catch (err) {
-                            triggerToast('JSON syntax error parse fail', 'error');
-                          }
-                        };
-                        reader.readAsText(file);
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Reset danger segment */}
-              <div className="bg-white border border-red-150 rounded-2xl p-6 shadow-xs space-y-4">
-                <h4 className="font-serif text-base text-red-700 font-bold pb-2 border-b border-red-100 flex items-center gap-1.5 uppercase tracking-wide">
-                  System danger zone
-                </h4>
-                <p className="text-slate-500 text-xs">
-                  Restore original company records, default investment plans, and clean slate registries. Discards current histories. This change cannot be undone.
-                </p>
-
-                <button
-                  onClick={handleBackupReset}
-                  className="bg-red-650 hover:bg-red-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer bg-red-600 hover:bg-red-700 transition-colors"
-                >
-                  Factory RESET Systems
-                </button>
-              </div>
-            </div>
-          )}
+              
 
           {/* TAB 8: ADMIN SECURE PASSWORD CHANGES WITH MOBILE OTP */}
           {activeTab === 'security' && (

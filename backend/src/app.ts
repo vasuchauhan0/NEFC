@@ -11,7 +11,6 @@ import contactRoutes from './modules/contact/routes.ts';
 import cmsRoutes from './modules/cms/routes.ts';
 import announcementRoutes from './modules/announcements/routes.ts';
 import dashboardRoutes from './modules/dashboard/routes.ts';
-import backupRoutes from './modules/backup/routes.ts';
 import otpRouter from './modules/auth/otp.ts';
 
 
@@ -38,7 +37,6 @@ app.use('/api', contactRoutes);
 app.use('/api', cmsRoutes);
 app.use('/api', announcementRoutes);
 app.use('/api', dashboardRoutes);
-app.use('/api', backupRoutes);
 app.use('/api/otp', otpRouter);
 
 export default app;
