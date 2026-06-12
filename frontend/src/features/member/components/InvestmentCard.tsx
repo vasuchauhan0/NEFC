@@ -26,9 +26,7 @@ export default function InvestmentCard({ investment, progressPercent }: Investme
             <span className="text-[10px] text-slate-400 font-mono">Ledge Contract: {investment.id}</span>
           </div>
         </div>
-        <span className="text-xs font-bold text-blue-700 font-mono bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
-          {investment.interestPct.toFixed(1)}% p.a.
-        </span>
+
       </div>
 
       <div className="py-4">
@@ -67,7 +65,17 @@ export default function InvestmentCard({ investment, progressPercent }: Investme
           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Net Maturity</div>
           <div className="text-sm font-bold text-blue-800 mt-1 font-mono">
             {isRD 
-              ? formatRupee(Math.round(investment.amount * investment.durationYears * 12 * (1 + (investment.interestPct/100)*0.45)))
+              ? (() => {
+                  // Standard RD Maturity formula (quarterly compounding):
+                  // M = P × [((1 + r/n)^(nt) - 1) / (r/n)] × (1 + r/n)
+                  const P = investment.amount;
+                  const r = investment.interestPct / 100;
+                  const n = 4; // quarterly compounding (standard for RD in India)
+                  const t = investment.durationYears;
+                  const rn = r / n;
+                  const maturity = P * (((Math.pow(1 + rn, n * t) - 1) / rn) * (1 + rn));
+                  return formatRupee(Math.round(maturity));
+                })()
               : formatRupee(Math.round(investment.amount * Math.pow(1 + investment.interestPct/100, investment.durationYears)))
             }
           </div>

@@ -30,10 +30,24 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
   const activeCompany = company || defaultCompany;
 
   const totalInvestmentAmount = activeInvestments.reduce((sum, inv) => {
+    const r = inv.interestPct / 100;
     if (inv.schemeType === 'rd') {
-      return sum + inv.amount * (inv.durationYears * 12);
+      // RD: total paid = monthly * months
+      const totalPaid = inv.amount * inv.durationYears * 12;
+      // RD maturity: standard quarterly compounding
+      const P = inv.amount;
+      const n = 4;
+      const t = inv.durationYears;
+      const rn = r / n;
+      const maturity = P * (((Math.pow(1 + rn, n * t) - 1) / rn) * (1 + rn));
+      return sum + totalPaid + Math.round(maturity);
+    } else {
+      // FD: total paid = principal
+      const totalPaid = inv.amount;
+      // FD maturity: annual compounding
+      const maturity = Math.round(inv.amount * Math.pow(1 + r, inv.durationYears));
+      return sum + totalPaid + maturity;
     }
-    return sum + inv.amount;
   }, 0);
 
   const getProgressPercentage = (startStr: string, endStr: string): number => {
