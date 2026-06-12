@@ -33,11 +33,11 @@ export interface TrustItem {
 }
 
 export interface InvestmentScheme {
-  id: string; // e.g. "FS-3" or "RI-5"
+  id: string;
   type: 'fd' | 'rd';
   durationYears: number;
-  interestPct: number; // Annual interest rate
-  maturityAmountPreview: number; // preview for FD (e.g. ₹1 Lakh) or RD (₹5,000/mo)
+  interestPct: number;
+  maturityAmountPreview: number;
   status: 'Active' | 'Popular' | 'Closed';
 }
 
@@ -45,24 +45,24 @@ export interface MemberInvestment {
   id: string;
   schemeId: string;
   schemeType: 'fd' | 'rd';
-  amount: number; // Principal for FD, monthly amount for RD
-  interestPct: number; // Annual interest percentage
+  amount: number;
+  interestPct: number;
   durationYears: number;
-  startDate: string; // ISO date format YYYY-MM-DD
-  maturityDate: string; // ISO date format YYYY-MM-DD
+  startDate: string;
+  maturityDate: string;
   status: 'Active' | 'Completed';
   paidMonths?: string[];
 }
 
 export interface Member {
-  id: string; // Member ID
+  id: string;
   name: string;
   email: string;
   phone: string;
   city: string;
-  password: string; // login password
+  password: string;
   status: 'Active' | 'Inactive';
-  memberSince: string; // Format e.g., "June 2024" or date string
+  memberSince: string;
   investments: MemberInvestment[];
   // KYC Details
   fatherName?: string;
@@ -76,8 +76,8 @@ export interface ContactMessage {
   id: string;
   name: string;
   contact: string;
-  phone?: string;
   subject: string;
+  phone?: string;
   message: string;
   date: string;
   read: boolean;
@@ -94,4 +94,6 @@ export interface SiteData {
   schemes: InvestmentScheme[];
   members: Member[];
   messages: ContactMessage[];
+  adminFailedAttempts?: number;
+  adminLockoutUntil?: number;
 }

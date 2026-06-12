@@ -235,15 +235,38 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     const data = await res.json();
     if (data.success) {
       setIsAdminOtpVerified(true);
-      const updated = { ...siteData, adminPass: adminPassForm.newPass };
-      await handleSaveData(updated, 'Admin password changed via OTP verification');
+      try {
+        const API = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${API}/api/company`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+          },
+          body: JSON.stringify({
+            newAdminPass: adminPassForm.newPass
+          }),
+        });
+        const resData = await response.json();
+        if (resData.success) {
+          await onUpdateData({
+            ...siteData,
+            adminPass: adminPassForm.newPass
+          });
+          triggerToast('Password changed successfully!', 'success');
+        } else {
+          triggerToast(resData.error || 'Failed to update admin password on backend', 'error');
+        }
+      } catch (err) {
+        console.error('Failed to change admin password:', err);
+        triggerToast('Could not save password on backend', 'error');
+      }
       setAdminPassForm({ newPass: '', confirmPass: '' });
       setIsAdminOtpSent(false);
       setIsAdminOtpVerified(false);
       setAdminOtpInput('');
       setAdminOtpCode('');
       setOtpNotification({ text: '', isOpen: false });
-      triggerToast('Password changed successfully!', 'success');
     } else {
       triggerToast(data.error || 'Invalid OTP', 'error');
     }
@@ -389,16 +412,34 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       nomineeRelation: mNomineeRelation || undefined,
     };
 
-    if (selectedMember) {
-      const idx = updatedMembers.findIndex(m => m.id === selectedMember.id);
-      if (idx !== -1) updatedMembers[idx] = memberObj;
-    } else {
-      updatedMembers.unshift(memberObj);
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ 
+          action: 'save', 
+          member: memberObj 
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({ 
+          ...siteData, 
+          members: data.members || [] 
+        });
+        triggerToast('Member profile saved successfully', 'success');
+        setShowMemberModal(false);
+      } else {
+        triggerToast(data.error || 'Failed to save member on backend', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to save member:', err);
+      triggerToast('Server connection failed', 'error');
     }
-
-    const nextData = { ...siteData, members: updatedMembers };
-    await handleSaveData(nextData, 'Member profile saved');
-    setShowMemberModal(false);
   };
 
   const handleDeleteMember = (id: string) => {
@@ -407,10 +448,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Member Account',
       message: 'Are you sure you want to delete this member? All of their active and historical investment records will be permanently discarded from the system.',
       onConfirm: async () => {
-        const nextMembers = safeData.members.filter(m => m.id !== id);
         try {
           const API = import.meta.env.VITE_API_URL || '';
-          await fetch(`${API}/api/members`, {
+          const response = await fetch(`${API}/api/members`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -418,10 +458,20 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
             },
             body: JSON.stringify({ action: 'delete', id }),
           });
+          const data = await response.json();
+          if (data.success) {
+            await onUpdateData({
+              ...siteData,
+              members: data.members || []
+            });
+            triggerToast('Member account deleted', 'success');
+          } else {
+            triggerToast(data.error || 'Failed to delete member on backend', 'error');
+          }
         } catch (err) {
-          console.error('Failed to delete member on backend:', err);
+          console.error('Failed to delete member backend:', err);
+          triggerToast('Server connection failed', 'error');
         }
-        await handleSaveData({ ...siteData, members: nextMembers }, 'Member account deleted');
         setSelectedDetailMemberId(null);
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -505,10 +555,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Delete Scheme Model',
       message: `Are you sure you want to delete the scheme "${id}"? This catalog plan option will no longer be visible to newly booked investments.`,
       onConfirm: async () => {
-        const next = safeData.schemes.filter(s => s.id !== id);
         try {
           const API = import.meta.env.VITE_API_URL || '';
-          await fetch(`${API}/api/schemes`, {
+          const response = await fetch(`${API}/api/schemes`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -516,10 +565,20 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
             },
             body: JSON.stringify({ action: 'delete', id }),
           });
+          const data = await response.json();
+          if (data.success) {
+            await onUpdateData({
+              ...siteData,
+              schemes: data.schemes || []
+            });
+            triggerToast('Scheme discarded', 'success');
+          } else {
+            triggerToast(data.error || 'Failed to delete scheme on backend', 'error');
+          }
         } catch (err) {
           console.error('Failed to delete scheme on backend:', err);
+          triggerToast('Server connection failed', 'error');
         }
-        await handleSaveData({ ...siteData, schemes: next }, 'Scheme discarded');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -553,18 +612,35 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       status: 'Active'
     };
 
-    const updatedMembers = safeData.members.map(m => {
-      if (m.id === investingMemberId) {
-        return {
-          ...m,
-          investments: [item, ...m.investments]
-        };
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ 
+          action: 'add-investment', 
+          memberId: investingMemberId,
+          investment: item
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({ 
+          ...siteData, 
+          members: data.members || [] 
+        });
+        triggerToast('New investment transaction booked successfully', 'success');
+        setShowInvestmentModal(false);
+      } else {
+        triggerToast(data.error || 'Failed to book investment on backend', 'error');
       }
-      return m;
-    });
-
-    await handleSaveData({ ...siteData, members: updatedMembers }, 'New investment transaction booked successfully');
-    setShowInvestmentModal(false);
+    } catch (err) {
+      console.error('Failed to add investment:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
   const handleInlineAddInvestment = async (schemeType: 'fd' | 'rd') => {
@@ -599,23 +675,39 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       status: 'Active'
     };
 
-    const updatedMembers = safeData.members.map(m => {
-      if (m.id === selectedDetailMemberId) {
-        return {
-          ...m,
-          investments: [item, ...(m.investments || [])]
-        };
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ 
+          action: 'add-investment', 
+          memberId: selectedDetailMemberId,
+          investment: item
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({ 
+          ...siteData, 
+          members: data.members || [] 
+        });
+        triggerToast(`New ${schemeType.toUpperCase()} investment booked for ${mem.name}`, 'success');
+        setInlineInvestment({
+          schemeId: '',
+          amount: schemeType === 'fd' ? 100000 : 5000,
+          startDate: new Date().toISOString().split('T')[0]
+        });
+      } else {
+        triggerToast(data.error || 'Failed to book investment on backend', 'error');
       }
-      return m;
-    });
-
-    await handleSaveData({ ...siteData, members: updatedMembers }, `New ${schemeType.toUpperCase()} investment booked for ${mem.name}`);
-    
-    setInlineInvestment({
-      schemeId: '',
-      amount: schemeType === 'fd' ? 100000 : 5000,
-      startDate: new Date().toISOString().split('T')[0]
-    });
+    } catch (err) {
+      console.error('Failed to add investment:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
   const handleDeleteInvestment = (memberId: string, investmentId: string) => {
@@ -624,18 +716,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       title: 'Revoke Ledger Transaction',
       message: 'Are you sure you want to permanently revoke and delete this active investment ledger item? This action is irreversible and affects the member portfolio balance calculations.',
       onConfirm: async () => {
-        const updatedMembers = safeData.members.map(m => {
-          if (m.id === memberId) {
-            return {
-              ...m,
-              investments: m.investments.filter(i => i.id !== investmentId)
-            };
-          }
-          return m;
-        });
         try {
           const API = import.meta.env.VITE_API_URL || '';
-          await fetch(`${API}/api/members`, {
+          const response = await fetch(`${API}/api/members`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -643,10 +726,17 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
             },
             body: JSON.stringify({ action: 'delete-investment', memberId, investmentId }),
           });
+          const data = await response.json();
+          if (data.success) {
+            await onUpdateData({ ...siteData, members: data.members || [] });
+            triggerToast('Investment ledger record deleted', 'success');
+          } else {
+            triggerToast(data.error || 'Failed to delete investment from database', 'error');
+          }
         } catch (err) {
           console.error('Failed to delete investment on backend:', err);
+          triggerToast('Server connection failed', 'error');
         }
-        await handleSaveData({ ...siteData, members: updatedMembers }, 'Investment ledger record deleted');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -658,23 +748,35 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
-    const updatedMembers = safeData.members.map(m => {
-      if (m.id === memberId) {
-        const nextInvestments = (m.investments || []).map(inv => {
-          if (inv.id === investmentId) {
-            return {
-              ...inv,
-              amount: newAmount
-            };
-          }
-          return inv;
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({
+          action: 'update-investment-amount',
+          memberId,
+          investmentId,
+          amount: newAmount,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({
+          ...siteData,
+          members: data.members || []
         });
-        return { ...m, investments: nextInvestments };
+        triggerToast('Investment ledger amount modified successfully', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to update investment on backend', 'error');
       }
-      return m;
-    });
-
-    await handleSaveData({ ...siteData, members: updatedMembers }, 'Investment ledger amount modified successfully');
+    } catch (err) {
+      console.error('Failed to update investment amount:', err);
+      triggerToast('Server connection failed', 'error');
+    }
     setEditingInvestmentId(null);
   };
 
@@ -707,46 +809,134 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       nextPaidMonths.push(monthStr);
     }
 
-    const updatedMembers = safeData.members.map(m => {
-      if (m.id === memberId) {
-        const nextInvestments = (m.investments || []).map(inv => {
-          if (inv.id === investmentId) {
-            return {
-              ...inv,
-              paidMonths: nextPaidMonths
-            };
-          }
-          return inv;
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({
+          action: 'update-paid-months',
+          memberId,
+          investmentId,
+          paidMonths: nextPaidMonths,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({
+          ...siteData,
+          members: data.members || []
         });
-        return { ...m, investments: nextInvestments };
+        triggerToast('Number of paid months updated successfully', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to update paid months on backend', 'error');
       }
-      return m;
-    });
-
-    await handleSaveData({ ...siteData, members: updatedMembers }, 'Number of paid months updated successfully');
+    } catch (err) {
+      console.error('Failed to update paid months:', err);
+      triggerToast('Server connection failed', 'error');
+    }
     setEditingPaidMonthsId(null);
   };
 
   // OTHER ADMIN WRITES
   const handleSaveAnnouncement = async () => {
-    await handleSaveData({ ...siteData, announcement: announcementText }, 'Announcement updated');
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/announcement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ text: announcementText }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({ ...siteData, announcement: data.announcement || '' });
+        triggerToast('Announcement updated', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to save announcement', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to update announcement:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
   const handleClearAnnouncement = async () => {
-    setAnnouncementText('');
-    await handleSaveData({ ...siteData, announcement: '' }, 'Announcement banner disabled');
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/announcement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ text: '' }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAnnouncementText('');
+        await onUpdateData({ ...siteData, announcement: '' });
+        triggerToast('Announcement banner disabled', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to clear announcement', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to clear announcement:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
   const handleSaveHero = async () => {
-    await handleSaveData({ ...siteData, hero: heroForm }, 'Homepage hero updated');
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/hero`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify(heroForm),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({ ...siteData, hero: data.hero });
+        triggerToast('Homepage hero updated', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to update hero content', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to save hero:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
   const handleSaveCompany = async () => {
-    const updated = {
-      ...siteData,
-      company: companyForm
-    };
-    await handleSaveData(updated, 'Corporate registry details updated');
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API}/api/company`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ company: companyForm }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        await onUpdateData({ ...siteData, company: data.company });
+        triggerToast('Corporate registry details updated', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to update company Details', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to save corporate details:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
 
@@ -760,7 +950,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
         const remainingMsgs = safeData.messages.filter(m => m.id !== id);
         try {
           const API = import.meta.env.VITE_API_URL || '';
-          await fetch(`${API}/api/messages/delete`, {
+          const response = await fetch(`${API}/api/messages/delete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -768,10 +958,17 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
             },
             body: JSON.stringify({ id }),
           });
+          const data = await response.json();
+          if (data.success) {
+            await onUpdateData({ ...siteData, messages: remainingMsgs });
+            triggerToast('Message deleted from inbox', 'success');
+          } else {
+            triggerToast(data.error || 'Failed to delete message on backend', 'error');
+          }
         } catch (err) {
           console.error('Failed to delete message on backend:', err);
+          triggerToast('Server connection failed', 'error');
         }
-        await handleSaveData({ ...siteData, messages: remainingMsgs }, 'Message deleted from inbox');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -1209,23 +1406,35 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                             <td className="py-3.5 px-3 text-right">
                               <button
                                 onClick={async () => {
-                                  const updatedMembers = safeData.members.map(m => {
-                                    if (m.id === member.id) {
-                                      const updatedInvestments = m.investments.map(inv => {
-                                        if (inv.id === investment.id) {
-                                          const paid = inv.paidMonths || [];
-                                          return {
-                                            ...inv,
-                                            paidMonths: [...paid, '2026-06']
-                                          };
-                                        }
-                                        return inv;
+                                  try {
+                                    const API = import.meta.env.VITE_API_URL || '';
+                                    const response = await fetch(`${API}/api/members`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+                                      },
+                                      body: JSON.stringify({
+                                        action: 'update-paid-months',
+                                        memberId: member.id,
+                                        investmentId: investment.id,
+                                        paidMonths: [...(investment.paidMonths || []), '2026-06']
+                                      }),
+                                    });
+                                    const data = await response.json();
+                                    if (data.success) {
+                                      await onUpdateData({
+                                        ...siteData,
+                                        members: data.members || []
                                       });
-                                      return { ...m, investments: updatedInvestments };
+                                      triggerToast(`Monthly RD instalment for ${member.name} registered as Paid from Dashboard`, 'success');
+                                    } else {
+                                      triggerToast(data.error || 'Failed to update RD details on backend', 'error');
                                     }
-                                    return m;
-                                  });
-                                  await handleSaveData({ ...siteData, members: updatedMembers }, `Monthly RD instalment for ${member.name} registered as Paid from Dashboard`);
+                                  } catch (err) {
+                                    console.error('Failed to register RD payment:', err);
+                                    triggerToast('Server connection failed', 'error');
+                                  }
                                 }}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors"
                               >
@@ -1730,21 +1939,35 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                 ) : (
                                   <button
                                     onClick={async () => {
-                                      const updatedMembers = safeData.members.map(m => {
-                                        if (m.id === member.id) {
-                                          return {
-                                            ...m,
-                                            investments: m.investments.map(inv => {
-                                              if (inv.id === investment.id) {
-                                                return { ...inv, paidMonths: [...(inv.paidMonths || []), monthKey] };
-                                              }
-                                              return inv;
-                                            })
-                                          };
+                                      try {
+                                        const API = import.meta.env.VITE_API_URL || '';
+                                        const response = await fetch(`${API}/api/members`, {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+                                          },
+                                          body: JSON.stringify({
+                                            action: 'update-paid-months',
+                                            memberId: member.id,
+                                            investmentId: investment.id,
+                                            paidMonths: [...(investment.paidMonths || []), monthKey]
+                                          }),
+                                        });
+                                        const data = await response.json();
+                                        if (data.success) {
+                                          await onUpdateData({
+                                            ...siteData,
+                                            members: data.members || []
+                                          });
+                                          triggerToast(`RD instalment ${monthLabel} for ${member.name} marked as Paid`, 'success');
+                                        } else {
+                                          triggerToast(data.error || 'Failed to update RD details on backend', 'error');
                                         }
-                                        return m;
-                                      });
-                                      await handleSaveData({ ...siteData, members: updatedMembers }, `RD instalment ${monthLabel} for ${member.name} marked as Paid`);
+                                      } catch (err) {
+                                        console.error('Failed to update paid months:', err);
+                                        triggerToast('Server connection failed', 'error');
+                                      }
                                     }}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 ml-auto"
                                   >

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { DashboardController } from './controller.ts';
-import { verifyAdminToken } from '../../shared/utils/db.ts';
+import { DashboardController } from './controller';
+import { verifyAdminToken, saveDatabase } from '../../shared/utils/db';
 
 const router = Router();
 const controller = new DashboardController();
@@ -21,5 +21,20 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
 router.get('/data', controller.getPublicData.bind(controller));
 router.get('/admin/data', requireAdmin, controller.getFullData.bind(controller));
+
+router.post('/admin/save-data', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { siteData } = req.body;
+    if (!siteData) {
+      res.status(400).json({ error: 'Missing siteData payload' });
+      return;
+    }
+    await saveDatabase(siteData);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[SERVER ERROR] Failed to save database settings:', err);
+    res.status(500).json({ error: 'Failed to save admin configurations' });
+  }
+});
 
 export default router;

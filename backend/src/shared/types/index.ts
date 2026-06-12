@@ -51,6 +51,7 @@ export interface MemberInvestment {
   startDate: string;
   maturityDate: string;
   status: 'Active' | 'Completed';
+  paidMonths?: string[];
 }
 
 export interface Member {

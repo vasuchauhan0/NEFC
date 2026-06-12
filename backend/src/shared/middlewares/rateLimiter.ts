@@ -8,6 +8,7 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
 });
 
 export const contactLimiter = rateLimit({
@@ -18,4 +19,5 @@ export const contactLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
 });

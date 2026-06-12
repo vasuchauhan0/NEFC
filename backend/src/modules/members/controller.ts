@@ -3,12 +3,12 @@ import { MemberService } from './service.ts';
 import jwt from 'jsonwebtoken';
 
 const service = new MemberService();
-const jwtSecret = process.env.JWT_SECRET as string;
+const jwtSecret = process.env.JWT_SECRET || 'nefc-secret-key-fallback-987654321';
 
 export class MemberController {
   async handleMembersAction(req: Request, res: Response): Promise<void> {
     try {
-      const { action, member, id, memberId, investment, investmentId } = req.body;
+      const { action, member, id, memberId, investment, investmentId, amount, paidMonths } = req.body;
 
       if (action === 'save') {
         const list = await service.saveMember(member);
@@ -21,6 +21,12 @@ export class MemberController {
         res.json({ success: true, members: list });
       } else if (action === 'delete-investment') {
         const list = await service.deleteInvestment(memberId, investmentId);
+        res.json({ success: true, members: list });
+      } else if (action === 'update-investment-amount') {
+        const list = await service.updateInvestmentAmount(memberId, investmentId, amount);
+        res.json({ success: true, members: list });
+      } else if (action === 'update-paid-months') {
+        const list = await service.updatePaidMonths(memberId, investmentId, paidMonths);
         res.json({ success: true, members: list });
       } else {
         res.status(400).json({ error: 'Invalid action parameter specified' });

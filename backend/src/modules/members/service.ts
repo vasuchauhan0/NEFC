@@ -23,4 +23,12 @@ export class MemberService {
   async deleteInvestment(memberId: string, investmentId: string): Promise<Member[]> {
     return repository.deleteInvestment(memberId, investmentId);
   }
+
+  async updateInvestmentAmount(memberId: string, investmentId: string, amount: number): Promise<Member[]> {
+    return repository.updateInvestmentAmount(memberId, investmentId, amount);
+  }
+
+  async updatePaidMonths(memberId: string, investmentId: string, paidMonths: string[]): Promise<Member[]> {
+    return repository.updatePaidMonths(memberId, investmentId, paidMonths);
+  }
 }

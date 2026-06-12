@@ -17,6 +17,8 @@ import otpRouter from './modules/auth/otp.ts';
 
 const app: Express = express();
 
+app.set('trust proxy', true);
+
 // Middlewares
 // Middlewares
 app.use(cors({
