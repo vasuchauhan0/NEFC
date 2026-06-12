@@ -30,23 +30,14 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
   const activeCompany = company || defaultCompany;
 
   const totalInvestmentAmount = activeInvestments.reduce((sum, inv) => {
-    const r = inv.interestPct / 100;
     if (inv.schemeType === 'rd') {
-      // RD: total paid = monthly * months
-      const totalPaid = inv.amount * inv.durationYears * 12;
-      // RD maturity: standard quarterly compounding
       const P = inv.amount;
-      const n = 4;
-      const t = inv.durationYears;
-      const rn = r / n;
-      const maturity = P * (((Math.pow(1 + rn, n * t) - 1) / rn) * (1 + rn));
-      return sum + totalPaid + Math.round(maturity);
+      const i = (inv.interestPct / 100) / 12;
+      const n = inv.durationYears * 12;
+      const maturity = i === 0 ? P * n : Math.round(P * ((Math.pow(1 + i, n) - 1) / i) * (1 + i));
+      return sum + maturity;
     } else {
-      // FD: total paid = principal
-      const totalPaid = inv.amount;
-      // FD maturity: annual compounding
-      const maturity = Math.round(inv.amount * Math.pow(1 + r, inv.durationYears));
-      return sum + totalPaid + maturity;
+      return sum + Math.round(inv.amount * Math.pow(1 + inv.interestPct / 100, inv.durationYears));
     }
   }, 0);
 

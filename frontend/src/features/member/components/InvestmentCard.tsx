@@ -67,17 +67,14 @@ export default function InvestmentCard({ investment, progressPercent }: Investme
             {isRD 
               ? (() => {
                   const P = investment.amount;
-                  const r = investment.interestPct / 100;
-                  const n = 4;
-                  const t = investment.durationYears;
-                  const rn = r / n;
-                  const maturity = P * (((Math.pow(1 + rn, n * t) - 1) / rn) * (1 + rn));
-                  const totalPaid = P * t * 12;
-                  return formatRupee(Math.round(totalPaid + maturity));
+                  const i = (investment.interestPct / 100) / 12;
+                  const n = investment.durationYears * 12;
+                  const maturity = i === 0 ? P * n : Math.round(P * ((Math.pow(1 + i, n) - 1) / i) * (1 + i));
+                  return formatRupee(maturity);
                 })()
               : (() => {
                   const maturity = Math.round(investment.amount * Math.pow(1 + investment.interestPct/100, investment.durationYears));
-                  return formatRupee(investment.amount + maturity);
+                  return formatRupee(maturity);
                 })()
             }
           </div>
