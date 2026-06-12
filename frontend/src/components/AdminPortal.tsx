@@ -9,8 +9,7 @@ import {
   Landmark, 
   RefreshCw, 
   FileText, 
-  MessageSquare, 
-  Settings, 
+  MessageSquare,  
   Activity, 
   Plus, 
   Edit, 
@@ -979,15 +978,6 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
               Password Security
             </button>
 
-            <button
-              onClick={() => { setActiveTab('settings'); setAdminMobileOpen(false); }}
-              className={`w-full text-left px-3 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors cursor-pointer ${
-                activeTab === 'settings' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
-              }`}
-            >
-              <Settings size={16} />
-              Wipe &amp; Backup
-            </button>
           </nav>
         </div>
 

@@ -136,15 +136,6 @@ export default function App() {
 
   const handleUpdateData = async (newData: SiteData) => {
     setSiteData(newData);
-    try {
-      await fetch(`${API}/api/data/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newData)
-      });
-    } catch (e) {
-      console.error('Failed to auto-sync layout definitions with Express server backend', e);
-    }
   };
 
   const handleMemberLogin = async (e: React.FormEvent) => {
