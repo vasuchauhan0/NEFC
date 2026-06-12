@@ -66,17 +66,19 @@ export default function InvestmentCard({ investment, progressPercent }: Investme
           <div className="text-sm font-bold text-blue-800 mt-1 font-mono">
             {isRD 
               ? (() => {
-                  // Standard RD Maturity formula (quarterly compounding):
-                  // M = P × [((1 + r/n)^(nt) - 1) / (r/n)] × (1 + r/n)
                   const P = investment.amount;
                   const r = investment.interestPct / 100;
-                  const n = 4; // quarterly compounding (standard for RD in India)
+                  const n = 4;
                   const t = investment.durationYears;
                   const rn = r / n;
                   const maturity = P * (((Math.pow(1 + rn, n * t) - 1) / rn) * (1 + rn));
-                  return formatRupee(Math.round(maturity));
+                  const totalPaid = P * t * 12;
+                  return formatRupee(Math.round(totalPaid + maturity));
                 })()
-              : formatRupee(Math.round(investment.amount * Math.pow(1 + investment.interestPct/100, investment.durationYears)))
+              : (() => {
+                  const maturity = Math.round(investment.amount * Math.pow(1 + investment.interestPct/100, investment.durationYears));
+                  return formatRupee(investment.amount + maturity);
+                })()
             }
           </div>
         </div>
