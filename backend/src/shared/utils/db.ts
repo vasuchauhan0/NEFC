@@ -211,14 +211,20 @@ export async function saveAdminToken(token: string): Promise<void> {
 }
 
 export async function verifyAdminToken(token: string): Promise<boolean> {
-  const now = new Date().toISOString();
-  const { data } = await supabase
-    .from('admin_tokens')
-    .select('token')
-    .eq('token', token)
-    .gt('expires_at', now)
-    .single();
-  return !!data;
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('admin_tokens')
+      .select('token')
+      .eq('token', token)
+      .gt('expires_at', now)
+      .single();
+    if (error) return false;
+    return !!data;
+  } catch (err) {
+    console.error('Error verifying admin token:', err);
+    return false;
+  }
 }
 
 export async function deleteAdminToken(token: string): Promise<void> {

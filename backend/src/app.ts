@@ -21,14 +21,16 @@ const app: Express = express();
 // Middlewares
 // Middlewares
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://nefc-ten.vercel.app',
-  ],
+  origin: (origin, callback) => {
+    // Mirror the incoming origin back to allow dynamic preview/development origins
+    if (!origin) {
+      callback(null, true);
+    } else {
+      callback(null, origin);
+    }
+  },
   credentials: true,
 }));
-app.use(express.json());
-
 
 // API Prefix Routing mapping
 app.use('/api', authRoutes);
