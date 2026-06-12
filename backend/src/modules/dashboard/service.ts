@@ -17,6 +17,11 @@ export class DashboardService {
 
   // Full data for admin
   async getFullData() {
-    return getDatabase();
-  }
+  const data = await getDatabase();
+  return {
+    ...data,
+    members: data.members.map(({ password, aadharNumber, panNumber, ...safe }) => safe),
+    adminPass: undefined   // never send admin password to frontend
+  };
+}
 }
