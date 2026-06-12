@@ -106,18 +106,19 @@ export async function saveDatabase(data: SiteData): Promise<void> {
   );
 
   // Upsert schemes
-  if (data.schemes.length > 0) {
-    await supabase.from('schemes').upsert(
-      data.schemes.map((s: any) => ({
-        id: s.id,
-        type: s.type,
-        duration_years: s.durationYears,
-        interest_pct: s.interestPct,
-        maturity_amount_preview: s.maturityAmountPreview,
-        status: s.status,
-      }))
-    );
-  }
+  // Upsert schemes — skip if empty to prevent accidental wipe from stale snapshots
+if (data.schemes && data.schemes.length > 0) {
+  await supabase.from('schemes').upsert(
+    data.schemes.map((s: any) => ({
+      id: s.id,
+      type: s.type,
+      duration_years: s.durationYears,
+      interest_pct: s.interestPct,
+      maturity_amount_preview: s.maturityAmountPreview,
+      status: s.status,
+    }))
+  );
+}
 
   // Upsert members
   if (data.members.length > 0) {

@@ -9,10 +9,12 @@ export class BackupService {
   }
 
   async importData(imported: SiteData): Promise<SiteData> {
-    if (!imported.adminPass || !imported.company || !Array.isArray(imported.members)) {
-      throw new Error('Invalid data backup format');
-    }
-    await saveDatabase(imported);
-    return imported;
+  if (!imported.adminPass || !imported.company || !Array.isArray(imported.members)) {
+    throw new Error('Invalid data backup format');
   }
+  // Never overwrite schemes via bulk import — schemes are managed via /api/schemes only
+  const { schemes, ...dataWithoutSchemes } = imported;
+  await saveDatabase({ ...dataWithoutSchemes, schemes: [] });
+  return imported;
+}
 }
