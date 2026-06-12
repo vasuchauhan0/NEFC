@@ -455,7 +455,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
-    const updatedSchemes = [...safeData.schemes];
+    // Build the clean Scheme object 
     const schemeObj: InvestmentScheme = {
       id: sId,
       type: sType,
@@ -465,15 +465,40 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       status: sStatus
     };
 
-    const idx = updatedSchemes.findIndex(s => s.id === sId);
-    if (idx !== -1) {
-      updatedSchemes[idx] = schemeObj;
-    } else {
-      updatedSchemes.push(schemeObj);
-    }
+    try {
+      const API = import.meta.env.VITE_API_URL || '';
+      
+      // Send a dedicated save command to the proper backend schemes controller
+      const response = await fetch(`${API}/api/schemes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+        },
+        body: JSON.stringify({ 
+          action: 'save', 
+          scheme: schemeObj 
+        }),
+      });
 
-    await handleSaveData({ ...siteData, schemes: updatedSchemes }, 'Investment scheme configurations saved');
-    setShowSchemeModal(false);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Sync local React frontend state with returned backend database records
+        await onUpdateData({ 
+          ...siteData, 
+          schemes: data.schemes || [] 
+        });
+        
+        triggerToast('Investment scheme configurations saved', 'success');
+        setShowSchemeModal(false);
+      } else {
+        triggerToast(data.error || 'Failed to save scheme on backend', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to save scheme on backend:', err);
+      triggerToast('Server connection failed', 'error');
+    }
   };
 
   const handleDeleteScheme = (id: string) => {
