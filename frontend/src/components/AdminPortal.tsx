@@ -140,7 +140,8 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
 
   const handleSaveRatesSheet = async () => {
     try {
-      const res = await fetch('/api/rates', {
+      const API = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${API}/api/rates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rates: ratesSheet })
@@ -2419,7 +2420,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                 <button
                   onClick={async () => {
                     try {
-                      await fetch('/api/messages/mark-all-read', { method: 'POST' });
+                      await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages/mark-all-read`, { method: 'POST' })
                       const updated = {
                         ...siteData,
                         messages: safeData.messages.map(m => ({ ...m, read: true }))
@@ -2467,7 +2468,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           <button
                             onClick={async () => {
                               try {
-                                await fetch('/api/messages/read', {
+                                await fetch(`${import.meta.env.VITE_API_URL || ''}/api/messages/read`, {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ id: m.id, read: true })
