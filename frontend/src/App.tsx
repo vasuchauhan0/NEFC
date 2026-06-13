@@ -134,42 +134,9 @@ export default function App() {
     }
   }, []);
 
-  const handleUpdateData = async (newData: SiteData) => {
-  try {
-    const response = await fetch(`${API}/api/admin/save-data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-token':
-          localStorage.getItem('nefc_admin_token') || '',
-      },
-      body: JSON.stringify({
-        siteData: newData,
-      }),
-    });
-
-    if (response.ok) {
-      // Update local state after successful save
-      setSiteData(newData);
-      return;
-    }
-
-    const errorData = await response
-      .json()
-      .catch(() => ({}));
-
-    throw new Error(
-      errorData.error ||
-      'Failed to save admin database on backend server'
-    );
-  } catch (err) {
-    console.error(
-      '[CLIENT ERROR] Failed to synchronize admin panel changes with backend ledger:',
-      err
-    );
-
-    throw err;
-  }
+// AFTER
+const handleUpdateData = async (newData: SiteData) => {
+  setSiteData(newData);
 };
 
   const handleMemberLogin = async (e: React.FormEvent) => {
