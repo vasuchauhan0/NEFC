@@ -104,3 +104,40 @@ export function saveSiteData(data: SiteData): void {
     console.error('Failed to save site data to localStorage', e);
   }
 }
+
+export function formatDuration(years: number): string {
+  const totalMonths = Math.round(years * 12);
+  const yrs = Math.floor(totalMonths / 12);
+  const mos = totalMonths % 12;
+
+  const parts: string[] = [];
+  if (yrs > 0) {
+    parts.push(`${yrs} ${yrs === 1 ? 'Year' : 'Years'}`);
+  }
+  if (mos > 0) {
+    parts.push(`${mos} ${mos === 1 ? 'Month' : 'Months'}`);
+  }
+  if (parts.length === 0) {
+    return '0 Months';
+  }
+  return parts.join(' ');
+}
+
+export function formatDurationShort(years: number): string {
+  const totalMonths = Math.round(years * 12);
+  const yrs = Math.floor(totalMonths / 12);
+  const mos = totalMonths % 12;
+
+  const parts: string[] = [];
+  if (yrs > 0) {
+    parts.push(`${yrs} ${yrs === 1 ? 'Yr' : 'Yrs'}`);
+  }
+  if (mos > 0) {
+    parts.push(`${mos} ${mos === 1 ? 'Mo' : 'Mos'}`);
+  }
+  if (parts.length === 0) {
+    return '0 Mo';
+  }
+  return parts.join(' ');
+}
+
