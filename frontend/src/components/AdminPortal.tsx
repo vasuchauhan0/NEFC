@@ -2872,19 +2872,21 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tenure term (years)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    name="durationYears"
-                    required
-                    value={schemeForm.durationYears}
-                    onChange={(e) => {
-                      const nextVal = parseFloat(e.target.value) || 0;
-                      const rep = recalculateMaturity(schemeForm.type, nextVal, schemeForm.interestPct);
-                      setSchemeForm({ ...schemeForm, durationYears: nextVal, maturityAmountPreview: rep });
-                    }}
-                    className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-semibold"
-                  />
+<input
+  type="number"
+  step="any"
+  min="0"
+  placeholder="e.g. 1.5 or 3"
+  name="durationYears"
+  required
+  value={schemeForm.durationYears || ''}
+  onChange={(e) => {
+    const nextVal = parseFloat(e.target.value) || 0;
+    const rep = recalculateMaturity(schemeForm.type, nextVal, schemeForm.interestPct);
+    setSchemeForm({ ...schemeForm, durationYears: nextVal, maturityAmountPreview: rep });
+  }}
+  className="block w-full px-3 py-2 border border-slate-200 bg-slate-50 text-slate-800 rounded-xl text-xs font-semibold"
+/>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Interest Yield % p.a.</label>
