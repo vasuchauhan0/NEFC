@@ -1,10 +1,17 @@
-import { getDatabase, deleteSchemeById, supabase } from '../../shared/utils/db';
+import { deleteSchemeById, supabase } from '../../shared/utils/db';
 import { InvestmentScheme } from '../../shared/types';
 
 export class SchemeRepository {
   async getAll(): Promise<InvestmentScheme[]> {
-    const data = await getDatabase();
-    return data.schemes || [];
+    const { data } = await supabase.from('schemes').select('*');
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      type: r.type,
+      durationYears: r.duration_years,
+      interestPct: r.interest_pct,
+      maturityAmountPreview: r.maturity_amount_preview,
+      status: r.status,
+    }));
   }
 
   async save(scheme: InvestmentScheme): Promise<InvestmentScheme[]> {
@@ -25,12 +32,14 @@ export class SchemeRepository {
   }
 
   async updateBulkRates(rates: Record<string, { interestPct: number; maturityAmountPreview: number }>): Promise<InvestmentScheme[]> {
-    for (const [id, r] of Object.entries(rates)) {
-      await supabase.from('schemes').update({
-        interest_pct: r.interestPct,
-        maturity_amount_preview: r.maturityAmountPreview
-      }).eq('id', id);
-    }
+    await Promise.all(
+      Object.entries(rates).map(([id, r]) =>
+        supabase.from('schemes').update({
+          interest_pct: r.interestPct,
+          maturity_amount_preview: r.maturityAmountPreview
+        }).eq('id', id)
+      )
+    );
     return this.getAll();
   }
 }

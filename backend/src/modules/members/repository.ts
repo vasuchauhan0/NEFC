@@ -1,10 +1,40 @@
-import { getDatabase, deleteMemberById, deleteInvestmentById, supabase } from '../../shared/utils/db';
+import { deleteMemberById, deleteInvestmentById, supabase } from '../../shared/utils/db';
 import { Member, MemberInvestment } from '../../shared/types';
 
 export class MemberRepository {
   async getAll(): Promise<Member[]> {
-    const data = await getDatabase();
-    return data.members || [];
+    const { data: membersData } = await supabase.from('members').select('*');
+    const { data: investmentsData } = await supabase.from('member_investments').select('*');
+
+    return (membersData || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      city: r.city,
+      password: r.password,
+      status: r.status,
+      memberSince: r.member_since,
+      fatherName: r.father_name ?? undefined,
+      aadharNumber: r.aadhar_number ?? undefined,
+      panNumber: r.pan_number ?? undefined,
+      nomineeName: r.nominee_name ?? undefined,
+      nomineeRelation: r.nominee_relation ?? undefined,
+      investments: (investmentsData || [])
+        .filter((i: any) => i.member_id === r.id)
+        .map((i: any) => ({
+          id: i.id,
+          schemeId: i.scheme_id,
+          schemeType: i.scheme_type,
+          amount: i.amount,
+          interestPct: i.interest_pct,
+          durationYears: i.duration_years,
+          startDate: i.start_date,
+          maturityDate: i.maturity_date,
+          status: i.status,
+          paidMonths: i.paid_months ?? [],
+        })),
+    }));
   }
 
   async findById(id: string): Promise<Member | undefined> {

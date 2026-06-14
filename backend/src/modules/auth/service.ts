@@ -1,4 +1,4 @@
-import { getDatabase, saveDatabase, saveAdminToken } from '../../shared/utils/db.ts';
+import { getDatabase, saveAdminToken, supabase } from '../../shared/utils/db.ts';
 import { Member } from '../../shared/types/index.ts';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
@@ -11,7 +11,6 @@ export class AuthService {
     const dbPassword = dbData?.adminPass;
     const envPassword = process.env.ADMIN_PASSWORD;
 
-    // Read lockout state from Supabase (survives restarts)
     const failedAttempts = dbData.adminFailedAttempts ?? 0;
     const lockoutUntil = dbData.adminLockoutUntil ?? 0;
 
@@ -21,7 +20,6 @@ export class AuthService {
       return { success: false, error: `Too many failed login attempts. Please wait ${waitSeconds} seconds.` };
     }
 
-    // Timing-safe comparison to prevent timing attacks
     let isDbMatch = false;
     if (dbPassword) {
       try {
@@ -39,27 +37,32 @@ export class AuthService {
     const isValid = isDbMatch || isEnvMatch;
 
     if (isValid) {
-      // Reset lockout in Supabase on success
-      dbData.adminFailedAttempts = 0;
-      dbData.adminLockoutUntil = 0;
-      await saveDatabase(dbData);
+      // Reset lockout — only update lockout fields, not entire database
+      await supabase.from('site_settings').upsert([
+        { key: 'adminFailedAttempts', value: 0 },
+        { key: 'adminLockoutUntil', value: 0 },
+      ]);
 
       const token = crypto.randomBytes(32).toString('hex');
       await saveAdminToken(token);
       return { success: true, token };
     }
 
-    // Save failed attempt to Supabase
     const nextAttempts = failedAttempts + 1;
-    dbData.adminFailedAttempts = nextAttempts;
 
     if (nextAttempts >= 5) {
-      dbData.adminLockoutUntil = now + 60000;
-      await saveDatabase(dbData);
+      // Save lockout — only update lockout fields, not entire database
+      await supabase.from('site_settings').upsert([
+        { key: 'adminFailedAttempts', value: nextAttempts },
+        { key: 'adminLockoutUntil', value: now + 60000 },
+      ]);
       return { success: false, error: 'Incorrect administrator password. Device blocked for 60 seconds.' };
     }
 
-    await saveDatabase(dbData);
+    // Save failed attempt — only update failed attempts field
+    await supabase.from('site_settings').upsert([
+      { key: 'adminFailedAttempts', value: nextAttempts },
+    ]);
     return { success: false, error: 'Incorrect administrator password' };
   }
 
@@ -98,11 +101,9 @@ export class AuthService {
     // Auto-upgrade plain password to bcrypt on first login
     if (needsMigration) {
       const hashed = await bcrypt.hash(pass, 12);
-      data.members[memberIndex].password = hashed;
-      await saveDatabase(data);
+      await supabase.from('members').update({ password: hashed }).eq('id', member.id);
     }
 
-    // Never send password back to frontend
     const { password, ...safeMember } = member;
     return { success: true, member: safeMember as Member };
   }

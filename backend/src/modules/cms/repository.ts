@@ -1,4 +1,4 @@
-import { getDatabase, supabase } from '../../shared/utils/db';
+import { supabase } from '../../shared/utils/db';
 import { HeroContent, StatItem, StepItem, TrustItem, Company } from '../../shared/types';
 
 export class CMSRepository {
@@ -23,15 +23,10 @@ export class CMSRepository {
   }
 
   async updateCompany(company?: Company, newAdminPass?: string): Promise<{ company: Company; adminPassChanged: boolean }> {
-    let adminPassChanged = false;
-    if (company) {
-      await supabase.from('site_settings').upsert({ key: 'company', value: company });
-    }
-    if (newAdminPass) {
-      await supabase.from('site_settings').upsert({ key: 'adminPass', value: newAdminPass });
-      adminPassChanged = true;
-    }
-    const data = await getDatabase();
-    return { company: data.company, adminPassChanged };
+    await Promise.all([
+      company ? supabase.from('site_settings').upsert({ key: 'company', value: company }) : Promise.resolve(),
+      newAdminPass ? supabase.from('site_settings').upsert({ key: 'adminPass', value: newAdminPass }) : Promise.resolve(),
+    ]);
+    return { company: company as Company, adminPassChanged: !!newAdminPass };
   }
 }
