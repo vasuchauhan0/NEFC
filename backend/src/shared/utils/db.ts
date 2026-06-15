@@ -186,8 +186,13 @@ export async function getDatabasePath(): Promise<string> {
 // ─── Admin Token Storage ──────────────────────────────────────────────────────
 
 export async function saveAdminToken(token: string): Promise<void> {
-  const now        = new Date().toISOString();
-  const expires_at = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+  const now = new Date();
+const expiry = new Date();
+expiry.setHours(1, 0, 0, 0); // 1:00:00 AM
+if (expiry <= now) {
+  expiry.setDate(expiry.getDate() + 1); // if already past 1 AM, set to next day 1 AM
+}
+const expires_at = expiry.toISOString();
   // Cleanup expired tokens and insert new one in parallel
   await Promise.all([
     supabase.from('admin_tokens').delete().lt('expires_at', now),
