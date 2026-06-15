@@ -344,13 +344,13 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   };
 
   const getUniqueGeneratedMemberId = (): string => {
-    let index = safeData.members.length + 11;
-    let attemptedId = `NEFC-2026-0${index}`;
-    while (safeData.members.some(m => m.id === attemptedId)) {
-      index++;
-      attemptedId = `NEFC-2026-0${index}`;
-    }
-    return attemptedId;
+    const year = new Date().getFullYear();
+    let id: string;
+    do {
+      const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+      id = `NEFC-${year}-${rand}`;
+    } while (safeData.members.some(m => m.id === id));
+    return id;
   };
 
   const handleOpenEditMember = (m: Member) => {
