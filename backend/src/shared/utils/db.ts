@@ -188,7 +188,7 @@ export async function getDatabasePath(): Promise<string> {
 export async function saveAdminToken(token: string): Promise<void> {
   const now = new Date();
 const expiry = new Date();
-expiry.setHours(1, 0, 0, 0); // 1:00:00 AM
+expiry.setHours(19, 30, 0, 0); // 1:00:00 AM
 if (expiry <= now) {
   expiry.setDate(expiry.getDate() + 1); // if already past 1 AM, set to next day 1 AM
 }
