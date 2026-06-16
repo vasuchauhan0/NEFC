@@ -853,7 +853,7 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
   // Layout toggle enabled: `size: A4` without orientation lock
   const handlePrintDetailsOnly = () => {
   if (!isRDSelected) {
-    // FD: plain text, one page
+    // FD: plain certificate matching the NEFC format
     triggerIframePrint('nefc_print_details_iframe', `
       <!DOCTYPE html>
       <html>
@@ -861,40 +861,93 @@ export default function PassbookModal({ isOpen, onClose, member, company }: Pass
           <title>FD Certificate - ${activeInv.id}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body {
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 13px;
+            body {
+              font-family: Arial, sans-serif;
+              font-size: 14px;
               color: #000;
               background: #fff;
-              white-space: pre;
+              padding: 40px 50px;
+            }
+            h2 {
+              text-align: center;
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 30px;
+              text-decoration: underline;
+              letter-spacing: 1px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            td {
+              padding: 8px 6px;
+              vertical-align: top;
+              font-size: 14px;
+            }
+            .lbl {
+              font-weight: bold;
+              width: 28%;
+            }
+            .val {
+              width: 22%;
             }
             @page {
               size: A4 portrait;
-              margin: 20mm 15mm;
+              margin: 15mm 20mm;
             }
           </style>
         </head>
-        <body>Member Id             : ${member.id}
-Policy No             : ${activeInv.id}
-
-Member Name           : ${member.name}
-Policy Opening Date   : ${activeInv.startDate}
-
-Address / City        : ${member.city || 'N/A'}
-Nominee Name          : ${member.nomineeName ? `${member.nomineeName} (${member.nomineeRelation || 'N/A'})` : 'N/A'}
-
-Plan                  : ${activeInv.schemeId}
-Period                : ${activeInv.durationYears * 12} Months
-
-Policy Amount(INR)    : ${formatAmountRaw(activeInv.amount)}
-Total Payable(INR)    : ${formatAmountRaw(activeInv.amount)}
-
-Maturity Date         : ${activeInv.maturityDate}
-Maturity Amount(INR)  : ${formatAmountRaw(getMaturityAmount(activeInv))}
+        <body>
+          <h2>FIXED DEPOSIT CERTIFICATE</h2>
+          <table>
+            <tr>
+              <td class="lbl">A/C No/Certificate No</td>
+              <td class="val">:${activeInv.id}</td>
+              <td class="lbl">Member Id</td>
+              <td class="val">:${member.id}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Mr/Mrs/Miss</td>
+              <td class="val">:${member.name}</td>
+              <td class="lbl">Deposit Date</td>
+              <td class="val">:${activeInv.startDate}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Father/Husband</td>
+              <td class="val">:${member.fatherName || 'N/A'}</td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td class="lbl">Nominee</td>
+              <td class="val" colspan="3">:${member.nomineeName ? `${member.nomineeName}` : 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Address</td>
+              <td class="val" colspan="3">:${member.city || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Maturity Date</td>
+              <td class="val">:${activeInv.maturityDate}</td>
+              <td class="lbl">Period</td>
+              <td class="val">:${activeInv.durationYears * 12} months</td>
+            </tr>
+            <tr>
+              <td class="lbl">Deposit Amount(INR)</td>
+              <td class="val">:${activeInv.amount}</td>
+              <td class="lbl">Maturity Amount(INR)</td>
+              <td class="val">:${Math.round(getMaturityAmount(activeInv))}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Plan Name</td>
+              <td class="val" colspan="3">:${activeInv.schemeId}</td>
+            </tr>
+          </table>
         </body>
       </html>
     `);
-    return; // stops here for FD, never reaches RD block
+    return;
   }
 
   // RD: your existing table HTML — completely unchanged
@@ -928,12 +981,8 @@ Maturity Amount(INR)  : ${formatAmountRaw(getMaturityAmount(activeInv))}
             width: 25%;
             white-space: nowrap;
           }
-          .val {
-            width: 25%;
-          }
-          @page {
-            margin: 0;
-          }
+          .val { width: 25%; }
+          @page { margin: 0; }
         </style>
       </head>
       <body>
