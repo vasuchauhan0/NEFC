@@ -195,7 +195,7 @@ if (expiry <= now) {
 const expires_at = expiry.toISOString();
   // Cleanup expired tokens and insert new one in parallel
   await Promise.all([
-    supabase.from('admin_tokens').delete().lt('expires_at', now),
+    supabase.from('admin_tokens').delete().lt('expires_at', now.toISOString()),
     supabase.from('admin_tokens').insert({ token, expires_at }),
   ]);
 }
