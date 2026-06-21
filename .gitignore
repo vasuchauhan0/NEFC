@@ -6,3 +6,4 @@ coverage/
 *.log
 .env*
 !.env.example
+wa_auth_session/
