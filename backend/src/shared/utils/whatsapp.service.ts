@@ -1,3 +1,4 @@
+ 
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -238,3 +239,21 @@ export async function sendPaymentReminderMessage(
 export async function initWhatsApp(): Promise<void> {
   await connect();
 }
+ 
+// ─── Graceful shutdown — prevents session conflicts during redeploys ─────────
+// When Railway stops the old container during a deploy, this closes the
+// WhatsApp socket cleanly instead of leaving it dangling, which otherwise
+// causes WhatsApp to see two active sessions at once and invalidate the login.
+function shutdown() {
+  console.log('🛑 Shutting down WhatsApp connection gracefully...');
+  try {
+    sock?.end(undefined as any);
+  } catch (e) {
+    // ignore errors during shutdown
+  }
+  process.exit(0);
+}
+ 
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+ 
