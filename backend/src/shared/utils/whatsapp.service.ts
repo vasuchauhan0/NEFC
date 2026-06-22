@@ -1,4 +1,3 @@
-
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -9,8 +8,13 @@ import qrcode from 'qrcode-terminal';
 import path from 'path';
 import { Member, MemberInvestment } from '../types/index.ts';
  
-// Auth session is saved here so you only scan the QR once
-const AUTH_FOLDER = path.resolve(process.cwd(), 'wa_auth_session');
+// Auth session is saved here so you only scan the QR once.
+// Locally this defaults to ./wa_auth_session (next to your backend code).
+// On Railway, set env var WA_AUTH_PATH to your mounted volume path,
+// e.g. WA_AUTH_PATH=/data/wa_auth_session
+const AUTH_FOLDER = process.env.WA_AUTH_PATH
+  ? path.resolve(process.env.WA_AUTH_PATH)
+  : path.resolve(process.cwd(), 'wa_auth_session');
  
 let sock: ReturnType<typeof makeWASocket> | null = null;
 let isConnected = false;
@@ -78,6 +82,37 @@ function fmt(n: number) {
 }
  
 // ─────────────────────────────────────────────────────────────────────────────
+//  MATURITY CALCULATIONS — mirrors frontend/src/shared/utils/index.ts exactly
+//  so WhatsApp messages always match what members see on the website.
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+// FD: one-time lump sum, compounded annually
+function calculateFDMaturity(principal: number, annualRate: number, years: number) {
+  const maturityAmount = Math.round(principal * Math.pow(1 + annualRate / 100, years));
+  const interestEarned = maturityAmount - principal;
+  return { maturityAmount, interestEarned };
+}
+ 
+// RD: recurring monthly deposit, compounded monthly
+function calculateRDMaturity(monthlyDeposit: number, annualRate: number, years: number) {
+  const P = monthlyDeposit;
+  const i = (annualRate / 100) / 12;
+  const n = Math.round(years * 12);
+ 
+  if (i === 0) {
+    const totalDeposited = P * n;
+    return { totalDeposited, maturityAmount: totalDeposited, interestEarned: 0 };
+  }
+ 
+  const totalDeposited = P * n;
+  const amount = P * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
+  const maturityAmount = Math.round(amount);
+  const interestEarned = Math.max(0, maturityAmount - totalDeposited);
+ 
+  return { totalDeposited, maturityAmount, interestEarned };
+}
+ 
+// ─────────────────────────────────────────────────────────────────────────────
 //  MESSAGE TEMPLATES — match your real Member / MemberInvestment types
 // ─────────────────────────────────────────────────────────────────────────────
  
@@ -108,18 +143,38 @@ export async function sendInvestmentUpdateMessage(
   const phone = member.phone?.replace(/\D/g, '');
   if (!phone) return;
  
-  const returns = investment.amount * (investment.interestPct / 100) * investment.durationYears;
-  const totalMaturity = investment.amount + returns;
+  const isRD = investment.schemeType === 'rd';
+ 
+  let amountLine: string;
+  let maturityAmount: number;
+ 
+  if (isRD) {
+    const { totalDeposited, maturityAmount: maturity } = calculateRDMaturity(
+      investment.amount,
+      investment.interestPct,
+      investment.durationYears
+    );
+    maturityAmount = maturity;
+    amountLine = `💰 *Monthly Deposit:* ${fmt(investment.amount)}\n` +
+                 `🧮 *Total Deposit (over term):* ${fmt(totalDeposited)}`;
+  } else {
+    const { maturityAmount: maturity } = calculateFDMaturity(
+      investment.amount,
+      investment.interestPct,
+      investment.durationYears
+    );
+    maturityAmount = maturity;
+    amountLine = `💰 *Amount Invested:* ${fmt(investment.amount)}`;
+  }
  
   const message =
     `📊 *Investment Update — NEFC Investment*\n\n` +
     `Hello *${member.name}*, your investment details:\n\n` +
     `📦 *Scheme:* ${investment.schemeType.toUpperCase()} — ${investment.durationYears} Year(s)\n` +
-    `💰 *Amount:* ${fmt(investment.amount)}\n` +
-    `📈 *Interest Rate:* ${investment.interestPct}% p.a.\n` +
+    `${amountLine}\n` +
     `📅 *Start Date:* ${investment.startDate}\n` +
     `🎯 *Maturity Date:* ${investment.maturityDate}\n` +
-    `💼 *Maturity Amount:* ${fmt(Math.round(totalMaturity))}\n` +
+    `💼 *Maturity Amount:* ${fmt(maturityAmount)}\n` +
     `✅ *Status:* ${investment.status}\n\n` +
     `View your full portfolio:\n` +
     `🔗 https://nefc-ten.vercel.app\n\n` +
@@ -183,4 +238,3 @@ export async function sendPaymentReminderMessage(
 export async function initWhatsApp(): Promise<void> {
   await connect();
 }
- 
