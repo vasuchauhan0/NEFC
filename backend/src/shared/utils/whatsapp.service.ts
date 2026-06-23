@@ -1,4 +1,3 @@
- 
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -19,41 +18,114 @@ const AUTH_FOLDER = process.env.WA_AUTH_PATH
  
 let sock: ReturnType<typeof makeWASocket> | null = null;
 let isConnected = false;
- 
+
+// ─── Reconnect-race guards ────────────────────────────────────────────────────
+// Prevents two sockets ever authenticating with the same session at once,
+// which is what actually causes WhatsApp's "conflict / device_removed / 401"
+// kick — NOT a real logout. Without this guard, a single 'close' event that
+// fires twice (which Baileys does sometimes) can spin up two concurrent
+// connect() calls, and WhatsApp's server treats that as a session conflict.
+let isConnecting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
 // ─── Connect / Re-connect ────────────────────────────────────────────────────
 async function connect(): Promise<void> {
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-  const { version } = await fetchLatestBaileysVersion();
- 
-  sock = makeWASocket({
-    version,
-    auth: state,
-    printQRInTerminal: false,
-  });
- 
-  sock.ev.on('creds.update', saveCreds);
- 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
- 
-    if (qr) {
-      console.log('\n📱 Scan this QR with WhatsApp (Linked Devices):\n');
-      qrcode.generate(qr, { small: true });
-    }
- 
-    if (connection === 'open') {
-      isConnected = true;
-      console.log('✅ WhatsApp connected!');
-    }
- 
-    if (connection === 'close') {
-      isConnected = false;
-      const shouldReconnect =
-        (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('⚠️  WhatsApp disconnected. Reconnecting:', shouldReconnect);
-      if (shouldReconnect) connect();
-    }
-  });
+  if (isConnecting) {
+    console.log('⏳ connect() already in progress — skipping duplicate call to avoid a session conflict.');
+    return;
+  }
+  isConnecting = true;
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+    const { version } = await fetchLatestBaileysVersion();
+
+    sock = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false,
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        console.log('\n📱 Scan this QR with WhatsApp (Linked Devices):\n');
+        qrcode.generate(qr, { small: true });
+      }
+
+      if (connection === 'open') {
+        isConnected = true;
+        isConnecting = false;
+        reconnectAttempts = 0; // reset backoff once we have a healthy connection
+        console.log('✅ WhatsApp connected!');
+      }
+
+      if (connection === 'close') {
+        isConnected = false;
+        isConnecting = false;
+
+        const boomError = lastDisconnect?.error as Boom | undefined;
+        const statusCode = boomError?.output?.statusCode;
+        // Dig into the raw stream error node Baileys attaches, so we can tell
+        // a genuine logout apart from a transient "conflict" kick.
+        const errData = (boomError as any)?.data;
+        const reasonTag: string | undefined =
+          errData?.attrs?.type || errData?.content?.[0]?.attrs?.type;
+
+        console.log(
+          `⚠️  WhatsApp disconnected. statusCode=${statusCode} reasonTag=${reasonTag ?? 'n/a'}`
+        );
+
+        // Only treat this as a REAL logout (stop reconnecting, need fresh QR)
+        // when it's a loggedOut code AND there's no conflict/device_removed
+        // tag — that tag means it was almost certainly a session race, not an
+        // intentional unlink from the phone.
+        const isRealLogout =
+          statusCode === DisconnectReason.loggedOut &&
+          reasonTag !== 'device_removed' &&
+          reasonTag !== 'conflict';
+
+        if (isRealLogout) {
+          console.error(
+            '🚫 WhatsApp session was actually logged out. ' +
+            'NOT auto-reconnecting — delete the auth session folder and rescan the QR code.'
+          );
+          return;
+        }
+
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          console.error(
+            `🚫 Hit max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) after repeated conflicts. ` +
+            'Giving up for now. Check WhatsApp → Linked Devices on the phone, and restart the service manually.'
+          );
+          return;
+        }
+
+        reconnectAttempts++;
+        const delayMs = Math.min(
+          MAX_RECONNECT_DELAY_MS,
+          BASE_RECONNECT_DELAY_MS * 2 ** reconnectAttempts
+        );
+        console.log(
+          `🔁 Reconnecting in ${delayMs}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
+        );
+        setTimeout(() => { connect(); }, delayMs);
+      }
+    });
+  } catch (err: any) {
+    // If makeWASocket/auth state setup itself throws before any
+    // connection.update fires, we must release the lock or every future
+    // connect() call deadlocks forever.
+    isConnecting = false;
+    console.error('❌ connect() failed during setup:', err?.message ?? err);
+    throw err;
+  }
 }
  
 // ─── Wait until socket is ready ──────────────────────────────────────────────
@@ -239,6 +311,11 @@ export async function sendPaymentReminderMessage(
 export async function initWhatsApp(): Promise<void> {
   await connect();
 }
+
+// ─── Status check — wire this to a GET /wa-status route to monitor health ────
+export function getWhatsAppStatus(): { connected: boolean; reconnectAttempts: number } {
+  return { connected: isConnected, reconnectAttempts };
+}
  
 // ─── Graceful shutdown — prevents session conflicts during redeploys ─────────
 // When Railway stops the old container during a deploy, this closes the
@@ -256,4 +333,3 @@ function shutdown() {
  
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
- 
