@@ -25,6 +25,8 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://nefc-ten.vercel.app',
+    'https://nefc.online',
+    'https://www.nefc.online',
   ],
   credentials: true,
 }));
