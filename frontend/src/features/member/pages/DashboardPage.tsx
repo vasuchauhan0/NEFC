@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User, FileText, HelpCircle, LogOut, BookOpen } from 'lucide-react';
 import DashboardStats from '../components/DashboardStats.tsx';
 import InvestmentCard from '../components/InvestmentCard.tsx';
-import PassbookModal from '../components/PassbookModal.tsx';
+import MemberTransactionsModal from '../components/MemberTransactionsModal.tsx';
 import { Member, Company } from '../../../shared/types/index.ts';
 
 interface DashboardPageProps {
@@ -93,7 +93,7 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
             id="open-passbook-btn"
           >
             <BookOpen size={14} />
-            View & Download Passbook
+            View & Download Deposits
           </button>
 
           <button
@@ -151,7 +151,7 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
       </div>
 
       {isPassbookOpen && (
-        <PassbookModal
+        <MemberTransactionsModal
           isOpen={isPassbookOpen}
           onClose={() => setIsPassbookOpen(false)}
           member={member}
