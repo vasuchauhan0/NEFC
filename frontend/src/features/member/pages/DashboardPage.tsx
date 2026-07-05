@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, ShieldCheck, FileText, HelpCircle, LogOut, BookOpen } from 'lucide-react';
+import { User, FileText, HelpCircle, LogOut, BookOpen } from 'lucide-react';
 import DashboardStats from '../components/DashboardStats.tsx';
 import InvestmentCard from '../components/InvestmentCard.tsx';
 import PassbookModal from '../components/PassbookModal.tsx';
@@ -38,6 +38,18 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
       return sum + maturity;
     } else {
       return sum + Math.round(inv.amount * Math.pow(1 + inv.interestPct / 100, inv.durationYears));
+    }
+  }, 0);
+
+  // Actual amount paid in by the member so far (not the projected maturity value).
+  // FD: the full principal is deposited upfront in one go.
+  // RD: only the installments actually marked as paid count towards the total.
+  const totalDepositedAmount = activeInvestments.reduce((sum, inv) => {
+    if (inv.schemeType === 'rd') {
+      const monthsPaid = inv.paidMonths?.length || 0;
+      return sum + inv.amount * monthsPaid;
+    } else {
+      return sum + inv.amount;
     }
   }, 0);
 
@@ -97,6 +109,7 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
 
       <DashboardStats
         totalAmount={totalInvestmentAmount}
+        totalDeposited={totalDepositedAmount}
         activeCount={activeInvestments.length}
         memberSince={member.memberSince}
       />
