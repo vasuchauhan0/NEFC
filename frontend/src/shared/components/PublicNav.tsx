@@ -44,14 +44,14 @@ export default function PublicNav({
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <span 
-              onClick={() => handleNav('home')} 
-              className="font-serif text-2xl font-bold text-blue-700 tracking-tight cursor-pointer select-none"
-              id="brand-logo"
-            >
-              {company.short}
-            </span>
-          </div>
+  <img
+    onClick={() => handleNav('home')}
+    src="/logo.svg"
+    alt={company.short}
+    className="h-10 w-auto cursor-pointer select-none"
+    id="brand-logo"
+  />
+</div>
 
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center space-x-8">
