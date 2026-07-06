@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { TrendingUp, ArrowRight } from 'lucide-react';
 import { HeroContent } from '../../../shared/types/index.ts';
+import CoinShower from './CoinShower.tsx';
 
 interface HeroProps {
   hero: HeroContent;
@@ -12,6 +13,20 @@ export default function Hero({ hero, navigate }: HeroProps) {
   return (
     <section className="relative overflow-hidden bg-gradient-to-tr from-blue-50 via-slate-50 to-emerald-50/50 py-16 md:py-24 border-b border-slate-100">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_100%,rgba(59,130,246,0.04),transparent_50%)]" />
+
+      {/* Floating background logo */}
+      <motion.img
+        src="/logo.svg"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none select-none absolute top-1/2 left-1/2 w-[600px] max-w-none opacity-[0.06] -z-0"
+        style={{ x: '-50%', y: '-50%' }}
+        animate={{ y: ['-52%', '-48%', '-52%'] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      <CoinShower />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
         <motion.div 
           initial={{ opacity: 0, y: 15 }} 
