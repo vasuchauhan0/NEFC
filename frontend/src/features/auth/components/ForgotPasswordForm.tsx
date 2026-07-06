@@ -27,7 +27,7 @@ export default function ForgotPasswordForm({ navigate }: ForgotPasswordFormProps
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/forgot-password`, {
+      const res = await fetch(`${API}/api/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -63,7 +63,7 @@ export default function ForgotPasswordForm({ navigate }: ForgotPasswordFormProps
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/reset-password`, {
+      const res = await fetch(`${API}/api/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code, newPassword }),
