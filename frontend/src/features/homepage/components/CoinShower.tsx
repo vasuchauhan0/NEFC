@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 
-const COIN_COUNT = 10;
+const COIN_COUNT = 14;
 
 function Coin({ left, delay, duration, size }: { left: number; delay: number; duration: number; size: number }) {
   return (
@@ -12,7 +12,7 @@ function Coin({ left, delay, duration, size }: { left: number; delay: number; du
       className="absolute pointer-events-none select-none"
       style={{ left: `${left}%`, top: '-60px' }}
       initial={{ y: 0, opacity: 0, rotate: 0 }}
-      animate={{ y: 620, opacity: [0, 1, 1, 0], rotate: 360 }}
+      animate={{ y: 620, opacity: [0, 0.9, 0.9, 0], rotate: 360 }}
       transition={{
         duration,
         delay,
@@ -49,13 +49,13 @@ export default function CoinShower() {
         left: (i / COIN_COUNT) * 90 + Math.random() * 8,
         delay: Math.random() * 6,
         duration: 7 + Math.random() * 4,
-        size: 18 + Math.random() * 14,
+        size: 22 + Math.random() * 16,
       })),
     []
   );
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40" aria-hidden="true">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-[5]" aria-hidden="true">
       {coins.map((c, i) => (
         <Coin key={i} left={c.left} delay={c.delay} duration={c.duration} size={c.size} />
       ))}
