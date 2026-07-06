@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { TrendingUp, ArrowRight } from 'lucide-react';
 import { HeroContent } from '../../../shared/types/index.ts';
 import CoinShower from './CoinShower.tsx';
+import HeroHeadlineLoop from './HeroHeadlineLoop.tsx';
 
 interface HeroProps {
   hero: HeroContent;
@@ -25,8 +26,6 @@ export default function Hero({ hero, navigate }: HeroProps) {
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      <CoinShower />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
         <motion.div 
           initial={{ opacity: 0, y: 15 }} 
@@ -37,14 +36,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
           {hero.tag}
         </motion.div>
         
-        <motion.h1 
-          initial={{ opacity: 0, y: 15 }} 
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-4xl sm:text-5xl md:text-6xl font-serif text-slate-900 font-bold mb-6 tracking-tight leading-tight max-w-4xl mx-auto"
-        >
-          Your trusted partner for <span className="text-blue-700 bg-clip-text">FD &amp; RD</span> investments
-        </motion.h1>
+        <HeroHeadlineLoop />
 
         <motion.p 
           initial={{ opacity: 0, y: 15 }} 
