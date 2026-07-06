@@ -6,6 +6,10 @@ import {
   sendInvestmentUpdateMessage,
   sendPaymentConfirmedMessage,
 } from '../../shared/utils/whatsapp.service.ts';
+import {
+  sendWelcomeEmail,
+  sendPaymentReceiptEmail,
+} from '../../shared/utils/email.service.ts';
 const service = new MemberService();
 const jwtSecret = process.env.JWT_SECRET || 'nefc-secret-key-fallback-987654321';
  
@@ -28,6 +32,9 @@ export class MemberController {
           if (savedMember) {
             sendWelcomeMessage(savedMember).catch((err: any) =>
   console.error('[WA] Welcome message failed:', err.message)
+);
+            sendWelcomeEmail(savedMember).catch((err: any) =>
+  console.error('[Email] Welcome email failed:', err.message)
 );
           }
         }
@@ -73,6 +80,9 @@ export class MemberController {
           if (updatedMember && inv) {
             sendPaymentConfirmedMessage(updatedMember, inv, latestMonth).catch((err: any) =>
               console.error('[WA] Payment confirmed message failed:', err.message)
+            );
+            sendPaymentReceiptEmail(updatedMember, inv, latestMonth).catch((err: any) =>
+              console.error('[Email] Payment receipt failed:', err.message)
             );
           }
         }

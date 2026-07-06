@@ -7,5 +7,7 @@ const controller = new AuthController();
 
 router.post('/login/admin', authLimiter, controller.adminLogin.bind(controller));
 router.post('/login/member', authLimiter, controller.memberLogin.bind(controller));
+router.post('/forgot-password', authLimiter, controller.forgotPassword.bind(controller));
+router.post('/reset-password', authLimiter, controller.resetPassword.bind(controller));
 
 export default router;

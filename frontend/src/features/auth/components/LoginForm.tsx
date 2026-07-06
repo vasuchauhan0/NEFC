@@ -94,9 +94,17 @@ export default function LoginForm({
             <Lock size={14} />
             {loginLoading ? 'Authenticating...' : 'Sign In Portal'}
           </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('forgot-password')}
+            className="w-full text-xs font-semibold text-blue-700 hover:text-blue-800 text-center cursor-pointer"
+          >
+            Forgot password?
+          </button>
           
           <div className="text-[10px] text-slate-400 text-center leading-normal pt-2 border-t border-slate-100 uppercase font-semibold">
-            * Membership accounts are registered formally at offline branches. Forgot password? Contact branch.
+            * Membership accounts are registered formally at offline branches.
           </div>
         </form>
 

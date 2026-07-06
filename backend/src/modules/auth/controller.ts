@@ -52,4 +52,36 @@ export class AuthController {
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
+
+  // Step 1: member requests an OTP be emailed to them
+  async forgotPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({ success: false, error: 'Email is required.' });
+        return;
+      }
+      const result = await authService.requestMemberPasswordReset(email);
+      res.json(result);
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+  }
+
+  // Step 2: member submits OTP + new password
+  async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { email, code, newPassword } = req.body;
+      if (!email || !code || !newPassword) {
+        res.status(400).json({ success: false, error: 'Email, code, and new password are required.' });
+        return;
+      }
+      const result = await authService.resetMemberPassword(email, code, newPassword);
+      res.json(result);
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+  }
 }

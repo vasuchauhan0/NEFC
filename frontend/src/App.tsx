@@ -24,6 +24,7 @@ import AboutView from './features/about/pages/AboutPage.tsx';
 import ContactView from './features/contact/pages/ContactPage.tsx';
 import MemberDashboard from './features/member/pages/DashboardPage.tsx';
 import LoginPage from './features/auth/pages/LoginPage.tsx';
+import ForgotPasswordForm from './features/auth/components/ForgotPasswordForm.tsx';
 import AdminLoginPage from './features/auth/pages/AdminLoginPage.tsx';
 import AdminPortal from './components/AdminPortal.tsx';
 
@@ -317,6 +318,9 @@ const handleUpdateData = async (newData: SiteData) => {
               setLoginError={setLoginError}
               navigate={setActivePage}
             />
+          )}
+          {activePage === 'forgot-password' && (
+            <ForgotPasswordForm navigate={setActivePage} />
           )}
           {activePage === 'admin-login' && (
             <AdminLoginPage
