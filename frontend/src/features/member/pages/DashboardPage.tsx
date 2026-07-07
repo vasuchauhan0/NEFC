@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { User, FileText, HelpCircle, LogOut, BookOpen } from 'lucide-react';
+import { User, FileText, HelpCircle, LogOut, BookOpen, IdCard } from 'lucide-react';
 import DashboardStats from '../components/DashboardStats.tsx';
 import InvestmentCard from '../components/InvestmentCard.tsx';
 import MemberTransactionsModal from '../components/MemberTransactionsModal.tsx';
+import PolicyDetailsModal from '../components/PolicyDetailsModal.tsx';
 import { Member, Company } from '../../../shared/types/index.ts';
 
 interface DashboardPageProps {
@@ -14,6 +15,7 @@ interface DashboardPageProps {
 
 export default function DashboardPage({ member, contactEmail, onLogout, company }: DashboardPageProps) {
   const [isPassbookOpen, setIsPassbookOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const activeInvestments = member.investments || [];
 
   const defaultCompany: Company = {
@@ -88,6 +90,15 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
+            onClick={() => setIsDetailsOpen(true)}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold shadow-xs select-none cursor-pointer transition-all"
+            id="open-details-btn"
+          >
+            <IdCard size={14} />
+            Details
+          </button>
+
+          <button
             onClick={() => setIsPassbookOpen(true)}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs select-none cursor-pointer transition-all"
             id="open-passbook-btn"
@@ -154,6 +165,15 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
         <MemberTransactionsModal
           isOpen={isPassbookOpen}
           onClose={() => setIsPassbookOpen(false)}
+          member={member}
+          company={activeCompany}
+        />
+      )}
+
+      {isDetailsOpen && (
+        <PolicyDetailsModal
+          isOpen={isDetailsOpen}
+          onClose={() => setIsDetailsOpen(false)}
           member={member}
           company={activeCompany}
         />
