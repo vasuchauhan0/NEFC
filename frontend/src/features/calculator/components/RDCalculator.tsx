@@ -48,7 +48,7 @@ export default function RDCalculator({
         >
           {rdSchemes.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.id} — {s.durationYears} {s.durationYears === 1 ? 'Year' : 'Years'} (@ {s.interestPct.toFixed(1)}% p.a.)
+              {s.id} — {s.durationYears} {s.durationYears === 1 ? 'Year' : 'Years'}
             </option>
           ))}
           {rdSchemes.length === 0 && <option value="">No Active Models</option>}

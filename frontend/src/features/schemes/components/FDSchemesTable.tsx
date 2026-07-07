@@ -40,7 +40,6 @@ export default function FDSchemesTable({ schemes }: FDSchemesTableProps) {
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Plan</th>
               <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Duration</th>
-              <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Rate</th>
               <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Maturity</th>
               <th className="py-2 px-2 sm:py-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase text-slate-500 tracking-wider">Tag</th>
             </tr>
@@ -50,14 +49,13 @@ export default function FDSchemesTable({ schemes }: FDSchemesTableProps) {
               <tr key={s.id} className="hover:bg-slate-50/50 transition-colors duration-150">
                 <td className="py-3 px-2 sm:py-4 sm:px-4 font-mono text-xs sm:text-sm font-semibold text-slate-800">{s.id}</td>
                 <td className="py-3 px-2 sm:py-4 sm:px-4 text-xs sm:text-sm text-slate-600 whitespace-nowrap">{s.durationYears} {s.durationYears === 1 ? 'Yr' : 'Yrs'}</td>
-                <td className="py-3 px-2 sm:py-4 sm:px-4 text-xs sm:text-sm font-semibold text-blue-700 whitespace-nowrap">{s.interestPct.toFixed(1)}%</td>
                 <td className="py-3 px-2 sm:py-4 sm:px-4 text-xs sm:text-sm font-semibold text-slate-800 font-mono whitespace-nowrap">{formatRupee(s.maturityAmountPreview)}</td>
                 <td className="py-3 px-2 sm:py-4 sm:px-4">{getStatusBadge(s.status)}</td>
               </tr>
             ))}
             {schemes.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No Active Fixed Deposit Options</td>
+                <td colSpan={4} className="py-8 text-center text-slate-400 text-sm">No Active Fixed Deposit Options</td>
               </tr>
             )}
           </tbody>
