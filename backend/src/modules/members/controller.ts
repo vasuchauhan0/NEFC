@@ -19,10 +19,28 @@ export class MemberController {
       const { action, member, id, memberId, investment, investmentId, amount, paidMonths } = req.body;
  
       if (action === 'save') {
+        // ── Validate & normalize email before saving (defense in depth,
+        // in case a request bypasses the admin UI's own validation) ────────
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!member?.email || !emailRegex.test(member.email.trim())) {
+          res.status(400).json({ success: false, error: 'Please enter a valid email address.' });
+          return;
+        }
+        member.email = member.email.trim().toLowerCase();
+
         // `save` is an upsert keyed on id, so check existence BEFORE saving
         // to correctly tell "new member" apart from "editing an existing one"
         const existingMembers = await service.getAllMembers();
         const isNewMember = !existingMembers.some(m => m.id === member.id);
+
+        // Prevent duplicate accounts differing only by case/whitespace
+        const emailTaken = existingMembers.some(
+          m => m.id !== member.id && m.email.toLowerCase().trim() === member.email
+        );
+        if (emailTaken) {
+          res.status(400).json({ success: false, error: 'A member with this email already exists.' });
+          return;
+        }
  
         const list = await service.saveMember(member);
  

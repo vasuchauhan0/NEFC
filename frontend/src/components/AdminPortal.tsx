@@ -386,9 +386,17 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = mEmail.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      triggerToast('Please enter a valid email address', 'error');
+      return;
+    }
+
     // Verify Unique Email Requirement
     const isEmailRegistered = safeData.members.some(
-      m => m.email.trim().toLowerCase() === mEmail.trim().toLowerCase() && m.id !== mId
+      m => m.email.trim().toLowerCase() === cleanEmail && m.id !== mId
     );
     if (isEmailRegistered) {
       triggerToast('this email is already registered', 'error');
@@ -399,7 +407,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     const memberObj: Member = {
       id: mId,
       name: mName,
-      email: mEmail,
+      email: cleanEmail,
       phone: mPhone,
       city: mCity,
       password: mPass || 'nefc@123',
