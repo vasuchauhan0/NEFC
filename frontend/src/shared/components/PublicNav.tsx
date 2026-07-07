@@ -46,10 +46,13 @@ export default function PublicNav({
           <div className="flex items-center">
             <span 
               onClick={() => handleNav('home')} 
-              className="font-serif text-2xl font-bold text-blue-700 tracking-tight cursor-pointer select-none"
+              className="flex items-center gap-2 cursor-pointer select-none"
               id="brand-logo"
             >
-              {company.short}
+              <img src="/logo.svg" alt={company.short} className="h-11 w-11 object-contain" />
+              <span className="font-serif text-2xl font-bold text-blue-700 tracking-tight">
+                {company.short}
+              </span>
             </span>
           </div>
 
