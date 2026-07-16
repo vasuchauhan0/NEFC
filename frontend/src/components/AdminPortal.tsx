@@ -992,6 +992,10 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   });
 
   // Calculate Metrics totals for Admin overview pane
+  const currentMonthKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  })();
   const totalBonds = safeData.members.reduce((sum, m) => sum + (m.investments?.length || 0), 0);
   const totalCapitalInPlay = safeData.members.reduce((sum, m) => {
     return sum + (m.investments || []).reduce((acc, inv) => {
@@ -1269,7 +1273,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       safeData.members.forEach(m => {
                         if (m.status === 'Active') {
                           (m.investments || []).forEach(inv => {
-                            if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
+                            if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes(currentMonthKey)) {
                               count++;
                             }
                           });
@@ -1285,7 +1289,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                         safeData.members.reduce((sum, m) => {
                           if (m.status !== 'Active') return sum;
                           return sum + (m.investments || []).reduce((acc, inv) => {
-                            if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
+                            if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes(currentMonthKey)) {
                               return acc + inv.amount;
                             }
                             return acc;
@@ -1383,7 +1387,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                         safeData.members.forEach(m => {
                           if (m.status === 'Active') {
                             (m.investments || []).forEach(inv => {
-                              if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
+                              if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes(currentMonthKey)) {
                                 dueRds.push({ member: m, investment: inv });
                               }
                             });
@@ -1427,7 +1431,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                                         action: 'update-paid-months',
                                         memberId: member.id,
                                         investmentId: investment.id,
-                                        paidMonths: [...(investment.paidMonths || []), '2026-06']
+                                        paidMonths: [...(investment.paidMonths || []), currentMonthKey]
                                       }),
                                     });
                                     const data = await response.json();
@@ -1835,7 +1839,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           safeData.members.reduce((sum, m) => {
                             if (m.status !== 'Active') return sum;
                             return sum + (m.investments || []).reduce((acc, inv) => {
-                              if (inv.schemeType === 'rd' && inv.status === 'Active' && (inv.paidMonths || []).includes('2026-06')) {
+                              if (inv.schemeType === 'rd' && inv.status === 'Active' && (inv.paidMonths || []).includes(currentMonthKey)) {
                                 return acc + inv.amount;
                               }
                               return acc;
@@ -1851,7 +1855,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                           safeData.members.reduce((sum, m) => {
                             if (m.status !== 'Active') return sum;
                             return sum + (m.investments || []).reduce((acc, inv) => {
-                              if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes('2026-06')) {
+                              if (inv.schemeType === 'rd' && inv.status === 'Active' && !(inv.paidMonths || []).includes(currentMonthKey)) {
                                 return acc + inv.amount;
                               }
                               return acc;

@@ -11,6 +11,10 @@ interface InvestmentCardProps {
 
 export default function InvestmentCard({ investment, progressPercent }: InvestmentCardProps) {
   const isRD = investment.schemeType === 'rd';
+  const currentMonthKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  })();
 
   return (
     <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs hover:border-slate-300 transition-colors">
@@ -84,8 +88,8 @@ export default function InvestmentCard({ investment, progressPercent }: Investme
       {isRD && (
         <div className="mt-4 bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 flex justify-between items-center text-xs text-emerald-800 font-medium">
           <span>Monthly Installment Status:</span>
-          <strong className={`${investment.paidMonths?.includes('2026-06') ? 'text-emerald-900 bg-emerald-105 bg-emerald-100' : 'text-amber-900 bg-amber-100'} px-2 py-0.5 rounded`}>
-            {investment.paidMonths?.includes('2026-06') ? 'Remitted (On Schedule)' : 'Impending (Due this Month)'}
+          <strong className={`${investment.paidMonths?.includes(currentMonthKey) ? 'text-emerald-900 bg-emerald-105 bg-emerald-100' : 'text-amber-900 bg-amber-100'} px-2 py-0.5 rounded`}>
+            {investment.paidMonths?.includes(currentMonthKey) ? 'Remitted (On Schedule)' : 'Impending (Due this Month)'}
           </strong>
         </div>
       )}
