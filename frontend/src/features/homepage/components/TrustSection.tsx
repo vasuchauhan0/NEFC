@@ -18,7 +18,7 @@ export default function TrustSection({ trust }: TrustSectionProps) {
   };
 
   return (
-    <section className="bg-zinc-950 border-t border-b border-white/10 py-16 md:py-24">
+    <section className="bg-[#0c0f16] border-t border-b border-white/10 py-16 md:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
@@ -31,7 +31,7 @@ export default function TrustSection({ trust }: TrustSectionProps) {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {trust.map((item, idx) => (
-            <div key={idx} className="bg-zinc-900 border border-white/10 p-6 rounded-2xl shadow-xs hover:border-blue-500/30 transition-colors duration-300">
+            <div key={idx} className="bg-[#12161f] border border-white/10 p-6 rounded-2xl shadow-xs hover:border-blue-500/40 transition-colors duration-300">
               <div className="bg-blue-500/10 p-3 rounded-xl inline-block mb-4">
                 {getTrustIcon(item.icon)}
               </div>

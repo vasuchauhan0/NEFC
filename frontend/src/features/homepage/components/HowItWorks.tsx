@@ -7,7 +7,7 @@ interface HowItWorksProps {
 
 export default function HowItWorks({ steps }: HowItWorksProps) {
   return (
-    <section className="py-16 md:py-24 bg-black">
+    <section className="py-16 md:py-24 bg-[#0a0e14]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
@@ -22,7 +22,7 @@ export default function HowItWorks({ steps }: HowItWorksProps) {
           {steps.map((step) => (
             <div 
               key={step.num}
-              className="bg-zinc-900 border border-white/10 p-6 rounded-2xl shadow-xs hover:shadow-md hover:shadow-blue-900/20 hover:-translate-y-1 hover:border-blue-500/30 transition-all duration-300 relative"
+              className="bg-[#12161f] border border-white/10 p-6 rounded-2xl shadow-xs hover:shadow-md hover:shadow-blue-900/20 hover:-translate-y-1 hover:border-blue-500/40 transition-all duration-300 relative"
             >
               <div className="h-10 w-10 text-xs font-bold rounded-xl bg-blue-500/15 text-blue-300 flex items-center justify-center mb-6">
                 STEP {step.num}

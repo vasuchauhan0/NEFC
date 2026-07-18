@@ -39,7 +39,7 @@ export default function PublicNav({
   };
 
   return (
-    <nav className="bg-black border-b border-white/10 sticky top-0 z-50 shadow-xs shadow-black/40">
+    <nav className="bg-[#0a0e14] border-b border-white/10 sticky top-0 z-50 shadow-xs shadow-black/40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
@@ -113,7 +113,7 @@ export default function PublicNav({
             ) : (
               <button
                 onClick={() => handleNav('login')}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                className="bg-gradient-to-r from-blue-700 to-blue-500 hover:from-blue-600 hover:to-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-xs cursor-pointer transition-all duration-250"
                 id="nav-login"
               >
                 <User size={15} />
@@ -137,7 +137,7 @@ export default function PublicNav({
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-zinc-950 border-b border-white/10 py-3 px-4 space-y-2">
+        <div className="md:hidden bg-[#0c0f16] border-b border-white/10 py-3 px-4 space-y-2">
           {links.map((link) => (
             <button
               key={link.id}
@@ -182,7 +182,7 @@ export default function PublicNav({
             ) : (
               <button
                 onClick={() => handleNav('login')}
-                className="w-full bg-blue-600 text-white hover:bg-blue-500 text-center font-medium text-sm px-3 py-2 rounded-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full bg-gradient-to-r from-blue-700 to-blue-500 text-white text-center font-medium text-sm px-3 py-2 rounded-md flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <User size={15} />
                 Member Login

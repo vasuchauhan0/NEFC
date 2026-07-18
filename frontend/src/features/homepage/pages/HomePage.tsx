@@ -15,10 +15,10 @@ interface HomePageProps {
 
 export default function HomePage({ hero, stats, steps, trust, navigate }: HomePageProps) {
   return (
-    <div className="bg-black">
+    <div className="bg-[#0a0e14]">
       <Hero hero={hero} navigate={navigate} />
       <StatsSection stats={stats} />
-      <section className="py-16 bg-black">
+      <section className="py-16 bg-[#0a0e14]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
@@ -29,7 +29,7 @@ export default function HomePage({ hero, stats, steps, trust, navigate }: HomePa
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="rounded-2xl overflow-hidden shadow-md shadow-black/40 border border-white/10 bg-zinc-900">
+            <div className="rounded-2xl overflow-hidden shadow-md shadow-black/40 border border-white/10 bg-[#12161f] hover:border-blue-500/40 transition-colors duration-300">
               <img src="/fd.jpg" alt="Fixed Deposit" className="w-full h-56 object-cover" />
               <div className="p-6">
                 <h3 className="font-serif text-xl font-bold text-white mb-2">Fixed Deposit</h3>
@@ -38,7 +38,7 @@ export default function HomePage({ hero, stats, steps, trust, navigate }: HomePa
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl overflow-hidden shadow-md shadow-black/40 border border-white/10 bg-zinc-900">
+            <div className="rounded-2xl overflow-hidden shadow-md shadow-black/40 border border-white/10 bg-[#12161f] hover:border-blue-500/40 transition-colors duration-300">
               <img src="/rd.jpg" alt="Recurring Deposit" className="w-full h-56 object-cover" />
               <div className="p-6">
                 <h3 className="font-serif text-xl font-bold text-white mb-2">Recurring Deposit</h3>
@@ -47,7 +47,7 @@ export default function HomePage({ hero, stats, steps, trust, navigate }: HomePa
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl overflow-hidden shadow-md shadow-black/40 border border-white/10 bg-zinc-900">
+            <div className="rounded-2xl overflow-hidden shadow-md shadow-black/40 border border-white/10 bg-[#12161f] hover:border-blue-500/40 transition-colors duration-300">
               <img src="/loan.jpeg" alt="Loan Against Deposit" className="w-full h-56 object-cover" />
               <div className="p-6">
                 <h3 className="font-serif text-xl font-bold text-white mb-2">Loan Against Deposit</h3>

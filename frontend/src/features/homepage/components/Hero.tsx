@@ -12,8 +12,8 @@ interface HeroProps {
 
 export default function Hero({ hero, navigate }: HeroProps) {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-tr from-black via-zinc-950 to-blue-950/40 py-16 md:py-24 border-b border-white/10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_100%,rgba(59,130,246,0.12),transparent_50%)]" />
+    <section id="home-hero" className="relative overflow-hidden bg-gradient-to-tr from-[#0a0e14] via-[#0c1017] to-[#0b1524] py-16 md:py-24 border-b border-white/10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_100%,rgba(59,130,246,0.14),transparent_50%)]" />
 
       {/* Floating background logo */}
       <motion.img
@@ -57,7 +57,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
         >
           <button
             onClick={() => navigate('schemes')}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-medium px-8 py-3.5 rounded-xl shadow-md shadow-blue-900/40 cursor-pointer flex items-center justify-center gap-2 transition-colors duration-150"
+            className="w-full sm:w-auto bg-gradient-to-r from-blue-700 to-blue-500 hover:from-blue-600 hover:to-blue-400 text-white font-medium px-8 py-3.5 rounded-xl shadow-md shadow-blue-900/40 cursor-pointer flex items-center justify-center gap-2 transition-all duration-250"
             id="hero-schemes"
           >
             <TrendingUp size={18} />
@@ -65,7 +65,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
           </button>
           <button
             onClick={() => navigate('calculator')}
-            className="w-full sm:w-auto bg-zinc-900 border border-white/15 text-slate-100 hover:bg-zinc-800 font-medium px-8 py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-colors duration-150"
+            className="w-full sm:w-auto bg-[#12161f] border border-white/15 text-slate-100 hover:border-blue-400/40 hover:bg-[#161b26] font-medium px-8 py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-all duration-250"
             id="hero-calculator"
           >
             Calculate Interest Rates
