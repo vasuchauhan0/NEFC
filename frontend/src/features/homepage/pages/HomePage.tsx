@@ -3,6 +3,7 @@ import Hero from '../components/Hero.tsx';
 import StatsSection from '../components/StatsSection.tsx';
 import HowItWorks from '../components/HowItWorks.tsx';
 import TrustSection from '../components/TrustSection.tsx';
+import ComboOfferSection from '../components/ComboOfferSection.tsx';
 import { HeroContent, StatItem, StepItem, TrustItem } from '../../../shared/types/index.ts';
 
 interface HomePageProps {
@@ -59,6 +60,7 @@ export default function HomePage({ hero, stats, steps, trust, navigate }: HomePa
           </div>
         </div>
       </section>
+      <ComboOfferSection />
       <HowItWorks steps={steps} />
       <TrustSection trust={trust} />
     </div>
