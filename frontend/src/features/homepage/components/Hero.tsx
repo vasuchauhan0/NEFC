@@ -12,8 +12,8 @@ interface HeroProps {
 
 export default function Hero({ hero, navigate }: HeroProps) {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-tr from-blue-50 via-slate-50 to-emerald-50/50 py-16 md:py-24 border-b border-slate-100">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_100%,rgba(59,130,246,0.04),transparent_50%)]" />
+    <section className="relative overflow-hidden bg-gradient-to-tr from-black via-zinc-950 to-blue-950/40 py-16 md:py-24 border-b border-white/10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_100%,rgba(59,130,246,0.12),transparent_50%)]" />
 
       {/* Floating background logo */}
       <motion.img
@@ -33,7 +33,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-block bg-blue-100/80 border border-blue-200/50 text-blue-800 text-xs px-3.5 py-1.5 rounded-full font-semibold tracking-wide mb-6 uppercase"
+          className="inline-block bg-blue-500/10 border border-blue-400/30 text-blue-300 text-xs px-3.5 py-1.5 rounded-full font-semibold tracking-wide mb-6 uppercase"
         >
           {hero.tag}
         </motion.div>
@@ -44,7 +44,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed font-sans"
+          className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed font-sans"
         >
           {hero.subtitle}
         </motion.p>
@@ -57,7 +57,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
         >
           <button
             onClick={() => navigate('schemes')}
-            className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white font-medium px-8 py-3.5 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2 transition-colors duration-150"
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-medium px-8 py-3.5 rounded-xl shadow-md shadow-blue-900/40 cursor-pointer flex items-center justify-center gap-2 transition-colors duration-150"
             id="hero-schemes"
           >
             <TrendingUp size={18} />
@@ -65,7 +65,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
           </button>
           <button
             onClick={() => navigate('calculator')}
-            className="w-full sm:w-auto bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 font-medium px-8 py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-colors duration-150"
+            className="w-full sm:w-auto bg-zinc-900 border border-white/15 text-slate-100 hover:bg-zinc-800 font-medium px-8 py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-colors duration-150"
             id="hero-calculator"
           >
             Calculate Interest Rates

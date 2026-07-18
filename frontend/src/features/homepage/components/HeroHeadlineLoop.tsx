@@ -24,7 +24,7 @@ function renderHeadline(len: number) {
   return (
     <>
       {prefix}
-      <span className="text-blue-700">{highlight}</span>
+      <span className="text-blue-400">{highlight}</span>
       {suffix}
     </>
   );
@@ -130,7 +130,7 @@ export default function HeroHeadlineLoop() {
   return (
     <div className="mb-6 max-w-4xl mx-auto min-h-[9rem] flex flex-col items-center justify-center">
       {mode === 'headline' ? (
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-slate-900 font-bold tracking-tight leading-tight min-h-[2.4em]">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-white font-bold tracking-tight leading-tight min-h-[2.4em]">
           {renderHeadline(headlineLen)}
         </h1>
       ) : (
@@ -139,13 +139,13 @@ export default function HeroHeadlineLoop() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <p className="text-lg sm:text-xl text-slate-500 font-serif mb-2">
+          <p className="text-lg sm:text-xl text-slate-400 font-serif mb-2">
             Securing your investments with
           </p>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-blue-700 tracking-tight leading-tight min-h-[1.2em]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-blue-400 tracking-tight leading-tight min-h-[1.2em]">
             {wordText}
             <span
-              className="inline-block w-[3px] bg-blue-700 ml-1 animate-pulse"
+              className="inline-block w-[3px] bg-blue-400 ml-1 animate-pulse"
               style={{ height: '0.9em', verticalAlign: 'middle' }}
             />
           </h1>
