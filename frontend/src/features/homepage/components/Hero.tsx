@@ -20,7 +20,7 @@ export default function Hero({ hero, navigate }: HeroProps) {
         src="/logo.svg"
         alt=""
         aria-hidden="true"
-        className="pointer-events-none select-none absolute top-1/2 left-1/2 w-[600px] max-w-none opacity-[0.06] -z-0"
+        className="pointer-events-none select-none absolute top-1/2 left-1/2 w-[600px] max-w-none opacity-[0.14] -z-0"
         style={{ x: '-50%', y: '-50%' }}
         animate={{ y: ['-52%', '-48%', '-52%'] }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
