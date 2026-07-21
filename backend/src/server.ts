@@ -4,13 +4,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import app from './app.ts';
 import { initWhatsApp } from './shared/utils/whatsapp.service.ts';
-import { startPaymentReminderScheduler } from './shared/utils/paymentReminderScheduler.ts'; // ← NEW
- 
+import { startPaymentReminderScheduler } from './shared/utils/paymentReminderScheduler.ts';
+import { startNotificationCleanupScheduler } from './shared/utils/notificationCleanupScheduler.ts';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
  
 // CORS
- 
+startNotificationCleanupScheduler();  
+
 // Only serve frontend static files in development
 if (process.env.NODE_ENV !== 'production') {
   const distPath = path.resolve(__dirname, '../../dist');

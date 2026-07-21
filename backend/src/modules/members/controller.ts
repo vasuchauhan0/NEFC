@@ -10,6 +10,7 @@ import {
   sendWelcomeEmail,
   sendPaymentReceiptEmail,
 } from '../../shared/utils/email.service.ts';
+import { sendPushToMember } from '../../shared/utils/push.service.ts';
 const service = new MemberService();
 const jwtSecret = process.env.JWT_SECRET || 'nefc-secret-key-fallback-987654321';
  
@@ -54,6 +55,10 @@ export class MemberController {
             sendWelcomeEmail(savedMember).catch((err: any) =>
   console.error('[Email] Welcome email failed:', err.message)
 );
+            sendPushToMember(savedMember.id, {
+              title: 'Welcome to NEFC',
+              body: `Welcome aboard, ${savedMember.name}! Your account is ready.`,
+            }).catch((err: any) => console.error('[Push] Welcome push failed:', err.message));
           }
         }
         // ───────────────────────────────────────────────────────────────────
@@ -74,6 +79,10 @@ export class MemberController {
           sendInvestmentUpdateMessage(updatedMember, newInvestment).catch((err: any) =>
             console.error('[WA] Investment update message failed:', err.message)
           );
+          sendPushToMember(updatedMember.id, {
+            title: 'New Investment Added',
+            body: `A new ${newInvestment.schemeType.toUpperCase()} investment of ₹${newInvestment.amount} has been added to your account.`,
+          }).catch((err: any) => console.error('[Push] Investment push failed:', err.message));
         }
         // ───────────────────────────────────────────────────────────────────
  
@@ -102,6 +111,10 @@ export class MemberController {
             sendPaymentReceiptEmail(updatedMember, inv, latestMonth).catch((err: any) =>
               console.error('[Email] Payment receipt failed:', err.message)
             );
+            sendPushToMember(updatedMember.id, {
+              title: 'Payment Received',
+              body: `Your instalment for ${latestMonth} has been confirmed. Thank you!`,
+            }).catch((err: any) => console.error('[Push] Payment confirmed push failed:', err.message));
           }
         }
         // ───────────────────────────────────────────────────────────────────

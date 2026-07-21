@@ -72,6 +72,15 @@ export interface Member {
   nomineeRelation?: string;
 }
 
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  data: Record<string, any>;
+  read: boolean;
+  created_at: string;
+}
+
 export interface ContactMessage {
   id: string;
   name: string;
