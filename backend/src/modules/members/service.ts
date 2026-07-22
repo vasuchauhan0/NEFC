@@ -16,6 +16,10 @@ export class MemberService {
     return repository.delete(id);
   }
 
+  async updatePhoto(memberId: string, photoUrl: string): Promise<Member[]> {
+    return repository.updatePhoto(memberId, photoUrl);
+  }
+
   async addInvestment(memberId: string, investment: Omit<MemberInvestment, 'id'>): Promise<Member[]> {
     return repository.addInvestment(memberId, investment);
   }

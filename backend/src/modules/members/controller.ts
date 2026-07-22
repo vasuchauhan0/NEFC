@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { MemberService } from './service.ts';
+import { PHOTOS_DIR, ensureUploadsDir } from '../../shared/utils/uploads.ts';
 import jwt from 'jsonwebtoken';
-import {
-  sendWelcomeMessage,
-  sendInvestmentUpdateMessage,
-  sendPaymentConfirmedMessage,
-} from '../../shared/utils/whatsapp.service.ts';
 import {
   sendWelcomeEmail,
   sendPaymentReceiptEmail,
@@ -45,13 +43,10 @@ export class MemberController {
  
         const list = await service.saveMember(member);
  
-        // ── WHATSAPP: welcome message for brand-new members ──────────────
+        // ── Welcome email/push for brand-new members ──────────────
         if (isNewMember) {
           const savedMember = list.find(m => m.id === member.id);
           if (savedMember) {
-            sendWelcomeMessage(savedMember).catch((err: any) =>
-  console.error('[WA] Welcome message failed:', err.message)
-);
             sendWelcomeEmail(savedMember).catch((err: any) =>
   console.error('[Email] Welcome email failed:', err.message)
 );
@@ -72,13 +67,10 @@ export class MemberController {
       } else if (action === 'add-investment') {
         const list = await service.addInvestment(memberId, investment);
  
-        // ── WHATSAPP: notify member of new investment ─────────────────────
+        // ── Notify member of new investment ─────────────────────
         const updatedMember = list.find(m => m.id === memberId);
         const newInvestment = updatedMember?.investments.at(-1); // latest investment just added
         if (updatedMember && newInvestment) {
-          sendInvestmentUpdateMessage(updatedMember, newInvestment).catch((err: any) =>
-            console.error('[WA] Investment update message failed:', err.message)
-          );
           sendPushToMember(updatedMember.id, {
             title: 'New Investment Added',
             body: `A new ${newInvestment.schemeType.toUpperCase()} investment of ₹${newInvestment.amount} has been added to your account.`,
@@ -99,15 +91,12 @@ export class MemberController {
       } else if (action === 'update-paid-months') {
         const list = await service.updatePaidMonths(memberId, investmentId, paidMonths);
  
-        // ── WHATSAPP: confirm latest month's payment ───────────────────────
+        // ── Confirm latest month's payment ───────────────────────
         if (paidMonths?.length > 0) {
           const latestMonth = paidMonths[paidMonths.length - 1]; // e.g. "June 2026"
           const updatedMember = list.find(m => m.id === memberId);
           const inv = updatedMember?.investments.find(i => i.id === investmentId);
           if (updatedMember && inv) {
-            sendPaymentConfirmedMessage(updatedMember, inv, latestMonth).catch((err: any) =>
-              console.error('[WA] Payment confirmed message failed:', err.message)
-            );
             sendPaymentReceiptEmail(updatedMember, inv, latestMonth).catch((err: any) =>
               console.error('[Email] Payment receipt failed:', err.message)
             );
@@ -165,6 +154,51 @@ export class MemberController {
       res.json({ success: true, member: safeMember });
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch member data.' });
+    }
+  }
+
+  // Accepts a single multipart image ('photo') from the logged-in member
+  // (req.memberId is set by the requireMember middleware), writes it to the
+  // uploads volume, and stores its public URL on the member's record.
+  async uploadPhoto(req: Request, res: Response): Promise<void> {
+    try {
+      const memberId = req.memberId;
+      const file = (req as any).file as { buffer: Buffer; originalname: string } | undefined;
+
+      if (!memberId) {
+        res.status(401).json({ error: 'Missing member session.' });
+        return;
+      }
+      if (!file) {
+        res.status(400).json({ error: 'No photo file was uploaded.' });
+        return;
+      }
+
+      ensureUploadsDir();
+
+      // Clear out any previous photo(s) for this member first, so the
+      // volume doesn't accumulate an orphaned file on every re-upload.
+      const existing = fs
+        .readdirSync(PHOTOS_DIR)
+        .filter(f => f.startsWith(`${memberId}-`) || f.startsWith(`${memberId}.`));
+      existing.forEach(f => {
+        try {
+          fs.unlinkSync(path.join(PHOTOS_DIR, f));
+        } catch {
+          // best-effort cleanup only
+        }
+      });
+
+      const ext = path.extname(file.originalname) || '.jpg';
+      const filename = `${memberId}-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(PHOTOS_DIR, filename), file.buffer);
+
+      const publicUrl = `${req.protocol}://${req.get('host')}/uploads/photos/${filename}`;
+      await service.updatePhoto(memberId, publicUrl);
+
+      res.json({ success: true, photoUrl: publicUrl });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to upload profile photo.' });
     }
   }
 }

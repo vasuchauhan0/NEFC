@@ -70,6 +70,7 @@ export interface Member {
   panNumber?: string;
   nomineeName?: string;
   nomineeRelation?: string;
+  photoUrl?: string;
 }
 
 export interface AppNotification {

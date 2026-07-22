@@ -2,7 +2,6 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 
-
 // Import Modular Routes
 import authRoutes from './modules/auth/routes.ts';
 import membersRoutes from './modules/members/routes.ts';
@@ -13,6 +12,7 @@ import announcementRoutes from './modules/announcements/routes.ts';
 import dashboardRoutes from './modules/dashboard/routes.ts';
 import notificationsRoutes from './modules/notifications/routes.ts';   // ← added
 import otpRouter from './modules/auth/otp.ts';
+import { UPLOADS_ROOT, ensureUploadsDir } from './shared/utils/uploads.ts';
 
 
 
@@ -32,6 +32,12 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Serves uploaded member profile photos (see shared/utils/uploads.ts for
+// where these actually live — set UPLOADS_PATH on Railway to a mounted
+// Volume so they persist across deploys).
+ensureUploadsDir();
+app.use('/uploads', express.static(UPLOADS_ROOT));
 
 
 // API Prefix Routing mapping

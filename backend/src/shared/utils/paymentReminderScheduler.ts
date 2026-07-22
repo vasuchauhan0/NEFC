@@ -1,6 +1,5 @@
 import cron from 'node-cron';
 import { MemberService } from '../../modules/members/service.ts';
-import { sendPaymentReminderMessage } from './whatsapp.service.ts';
 import { sendPushToMember } from './push.service.ts';
  
 const service = new MemberService();
@@ -51,21 +50,11 @@ async function runReminderCheck(): Promise<void> {
  
         // Only fire on exactly 3 days before, or exactly on the due day
         if (diffDays === 3 || diffDays === 0) {
-          await sendPaymentReminderMessage(
-            member,
-            inv,
-            monthLabel,
-            formatDueDate(dueDateThisMonth),
-            diffDays
-          );
           sendPushToMember(member.id, {
             title: diffDays === 0 ? 'Instalment Due Today' : 'Instalment Due Soon',
             body: `Your ${inv.schemeType.toUpperCase()} instalment for ${monthLabel} is due ${diffDays === 0 ? 'today' : `on ${formatDueDate(dueDateThisMonth)}`}.`,
           }).catch((err: any) => console.error('[Push] Reminder push failed:', err.message));
           remindersSent++;
- 
-          // small delay between sends to stay gentle on WhatsApp
-          await new Promise((r) => setTimeout(r, 2000));
         }
       }
     }
