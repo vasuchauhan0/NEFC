@@ -66,7 +66,7 @@ export class MemberRepository {
   // Deliberately separate from save(): save() is the admin panel's full-record
   // upsert, and its payload never carries photoUrl, so folding photo_url into
   // that upsert would null out an existing photo on every unrelated admin edit.
-  async updatePhoto(memberId: string, photoUrl: string): Promise<Member[]> {
+  async updatePhoto(memberId: string, photoUrl: string | null): Promise<Member[]> {
     await supabase.from('members').update({ photo_url: photoUrl }).eq('id', memberId);
     return this.getAll();
   }

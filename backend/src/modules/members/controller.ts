@@ -201,4 +201,33 @@ export class MemberController {
       res.status(500).json({ error: 'Failed to upload profile photo.' });
     }
   }
+
+  // Deletes the member's stored photo file(s) from the uploads volume and
+  // clears photo_url on their record.
+  async removePhoto(req: Request, res: Response): Promise<void> {
+    try {
+      const memberId = req.memberId;
+      if (!memberId) {
+        res.status(401).json({ error: 'Missing member session.' });
+        return;
+      }
+
+      ensureUploadsDir();
+      const existing = fs
+        .readdirSync(PHOTOS_DIR)
+        .filter(f => f.startsWith(`${memberId}-`) || f.startsWith(`${memberId}.`));
+      existing.forEach(f => {
+        try {
+          fs.unlinkSync(path.join(PHOTOS_DIR, f));
+        } catch {
+          // best-effort cleanup only
+        }
+      });
+
+      await service.updatePhoto(memberId, null);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to remove profile photo.' });
+    }
+  }
 }

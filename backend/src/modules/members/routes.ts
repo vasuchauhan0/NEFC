@@ -36,5 +36,6 @@ function handlePhotoUpload(req: Request, res: Response, next: NextFunction) {
 router.post('/members', requireAdmin, controller.handleMembersAction.bind(controller));
 router.get('/member/me', controller.getMe.bind(controller));
 router.post('/member/me/photo', requireMember, handlePhotoUpload, controller.uploadPhoto.bind(controller));
+router.delete('/member/me/photo', requireMember, controller.removePhoto.bind(controller));
 
 export default router;
