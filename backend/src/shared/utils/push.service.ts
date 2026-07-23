@@ -40,6 +40,19 @@ async function sendExpoPushMessages(tokens: string[], payload: PushPayload): Pro
     body: payload.body,
     data: payload.data || {},
     sound: 'default',
+    // Without these two, delivery while the app is backgrounded/killed is
+    // unreliable on BOTH platforms:
+    // - priority: 'high' tells FCM (Android) to wake the device and
+    //   deliver immediately instead of deferring during Doze/idle, and
+    //   maps to a high-priority APNs push (iOS) instead of a "whenever
+    //   convenient" one.
+    // - channelId must match the "default" channel the app creates
+    //   client-side (see pushNotifications.ts) with MAX importance —
+    //   without this, Android can silently route the notification to a
+    //   generic low-importance channel that never surfaces while the app
+    //   isn't in the foreground.
+    priority: 'high' as const,
+    channelId: 'default',
   }));
 
   try {
@@ -54,12 +67,23 @@ async function sendExpoPushMessages(tokens: string[], payload: PushPayload): Pro
 
     const result = await res.json().catch(() => null);
 
-    // Prune tokens Expo reports as dead so we stop pushing to them.
+    // Prune tokens Expo reports as dead so we stop pushing to them, and log
+    // any other errors — e.g. "InvalidCredentials" usually means the FCM
+    // service account key hasn't been uploaded via `eas credentials` yet,
+    // which otherwise fails completely silently from the app's perspective.
     const tickets: any[] = result?.data || [];
     const deadTokens: string[] = [];
     tickets.forEach((ticket, i) => {
-      if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
-        deadTokens.push(validTokens[i]);
+      if (ticket?.status === 'error') {
+        if (ticket?.details?.error === 'DeviceNotRegistered') {
+          deadTokens.push(validTokens[i]);
+        } else {
+          console.error(
+            `[Push] Expo rejected a message (token ${validTokens[i]}):`,
+            ticket.message,
+            ticket.details
+          );
+        }
       }
     });
     if (deadTokens.length > 0) {
