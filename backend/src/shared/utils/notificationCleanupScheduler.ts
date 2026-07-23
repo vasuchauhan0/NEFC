@@ -14,18 +14,34 @@ async function runNotificationCleanup(): Promise<void> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-    const { error, count } = await supabase
+    // Personal, member-scoped notifications: only clean up once read.
+    const { error: personalError, count: personalCount } = await supabase
       .from('notifications')
       .delete({ count: 'exact' })
       .eq('read', true)
+      .not('member_id', 'is', null)
       .lt('created_at', cutoff.toISOString());
 
-    if (error) {
-      console.error('❌ [Notification Cleanup] Error:', error.message);
+    if (personalError) {
+      console.error('❌ [Notification Cleanup] Error (personal):', personalError.message);
+    }
+
+    // Broadcast announcements (member_id IS NULL) track read state
+    // per-member in `notification_reads`, not on the row itself, so age
+    // alone decides when they're removed. `notification_reads` rows for
+    // them are cleaned up automatically via ON DELETE CASCADE.
+    const { error: broadcastError, count: broadcastCount } = await supabase
+      .from('notifications')
+      .delete({ count: 'exact' })
+      .is('member_id', null)
+      .lt('created_at', cutoff.toISOString());
+
+    if (broadcastError) {
+      console.error('❌ [Notification Cleanup] Error (broadcast):', broadcastError.message);
       return;
     }
 
-    console.log(`✅ [Notification Cleanup] Done. Removed ${count ?? 0} old notification(s).`);
+    console.log(`✅ [Notification Cleanup] Done. Removed ${(personalCount ?? 0) + (broadcastCount ?? 0)} old notification(s).`);
   } catch (err: any) {
     console.error('❌ [Notification Cleanup] Error:', err.message);
   }

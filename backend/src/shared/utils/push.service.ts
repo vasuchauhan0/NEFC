@@ -130,15 +130,19 @@ export async function sendPushToAllMembers(
   if (memberIds.length === 0) return;
 
   try {
-    const rows = memberIds.map(memberId => ({
-      id: `NOTIF-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${memberId}`,
-      member_id: memberId,
+    // ONE shared row for the whole broadcast (member_id = null), not one
+    // per member. Per-member read state is tracked separately in
+    // `notification_reads` (see repository.ts), so this no longer creates
+    // N duplicate rows with identical title/body every time an admin
+    // updates the announcement.
+    await supabase.from('notifications').insert({
+      id: `NOTIF-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      member_id: null,
       title: payload.title,
       body: payload.body,
       data: payload.data || {},
       read: false,
-    }));
-    await supabase.from('notifications').insert(rows);
+    });
 
     const { data: tokenRows } = await supabase
       .from('push_tokens')
