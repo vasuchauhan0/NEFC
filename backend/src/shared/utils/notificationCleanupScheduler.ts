@@ -1,47 +1,33 @@
 import cron from 'node-cron';
 import { supabase } from './db.ts';
 
-// Keeps the `notifications` table from growing forever. Only removes
-// notifications that are BOTH read AND older than the retention window —
-// unread notifications are never touched, no matter how old, so a member
-// can never lose something they haven't seen yet.
-const RETENTION_DAYS = 90;
+// Keeps the `notifications` table from growing forever. Removes ANY
+// notification older than the retention window, read or unread — after 7
+// days a notification is simply gone from everyone's inbox.
+const RETENTION_DAYS = 7;
 
 async function runNotificationCleanup(): Promise<void> {
-  console.log(`🧹 [Notification Cleanup] Removing read notifications older than ${RETENTION_DAYS} days...`);
+  console.log(`🧹 [Notification Cleanup] Removing notifications older than ${RETENTION_DAYS} days...`);
 
   try {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-    // Personal, member-scoped notifications: only clean up once read.
-    const { error: personalError, count: personalCount } = await supabase
+    // Age alone decides removal now — no `read` filter. This covers both
+    // personal notifications and broadcast announcements (member_id IS
+    // NULL); any `notification_reads` rows for a deleted broadcast are
+    // removed automatically via ON DELETE CASCADE.
+    const { error, count } = await supabase
       .from('notifications')
       .delete({ count: 'exact' })
-      .eq('read', true)
-      .not('member_id', 'is', null)
       .lt('created_at', cutoff.toISOString());
 
-    if (personalError) {
-      console.error('❌ [Notification Cleanup] Error (personal):', personalError.message);
-    }
-
-    // Broadcast announcements (member_id IS NULL) track read state
-    // per-member in `notification_reads`, not on the row itself, so age
-    // alone decides when they're removed. `notification_reads` rows for
-    // them are cleaned up automatically via ON DELETE CASCADE.
-    const { error: broadcastError, count: broadcastCount } = await supabase
-      .from('notifications')
-      .delete({ count: 'exact' })
-      .is('member_id', null)
-      .lt('created_at', cutoff.toISOString());
-
-    if (broadcastError) {
-      console.error('❌ [Notification Cleanup] Error (broadcast):', broadcastError.message);
+    if (error) {
+      console.error('❌ [Notification Cleanup] Error:', error.message);
       return;
     }
 
-    console.log(`✅ [Notification Cleanup] Done. Removed ${(personalCount ?? 0) + (broadcastCount ?? 0)} old notification(s).`);
+    console.log(`✅ [Notification Cleanup] Done. Removed ${count ?? 0} old notification(s).`);
   } catch (err: any) {
     console.error('❌ [Notification Cleanup] Error:', err.message);
   }
