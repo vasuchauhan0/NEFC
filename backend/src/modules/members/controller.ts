@@ -9,7 +9,11 @@ import {
   sendPaymentReceiptEmail,
 } from '../../shared/utils/email.service.ts';
 import { sendPushToMember } from '../../shared/utils/push.service.ts';
-import { sendPaymentReceivedWhatsApp } from '../../shared/utils/whatsapp.service.ts';
+import {
+  sendPaymentReceivedWhatsApp,
+  sendWelcomeWhatsApp,
+  sendInvestmentUpdateWhatsApp,
+} from '../../shared/utils/whatsapp.service.ts';
 const service = new MemberService();
 const jwtSecret = process.env.JWT_SECRET || 'nefc-secret-key-fallback-987654321';
  
@@ -55,6 +59,9 @@ export class MemberController {
               title: 'Welcome to NEFC',
               body: `Welcome aboard, ${savedMember.name}! Your account is ready.`,
             }).catch((err: any) => console.error('[Push] Welcome push failed:', err.message));
+            sendWelcomeWhatsApp(savedMember).catch((err: any) =>
+              console.error('[WhatsApp] Welcome message failed:', err.message)
+            );
           }
         }
         // ───────────────────────────────────────────────────────────────────
@@ -76,6 +83,9 @@ export class MemberController {
             title: 'New Investment Added',
             body: `A new ${newInvestment.schemeType.toUpperCase()} investment of ₹${newInvestment.amount} has been added to your account.`,
           }).catch((err: any) => console.error('[Push] Investment push failed:', err.message));
+          sendInvestmentUpdateWhatsApp(updatedMember, newInvestment).catch((err: any) =>
+            console.error('[WhatsApp] Investment update message failed:', err.message)
+          );
         }
         // ───────────────────────────────────────────────────────────────────
  
