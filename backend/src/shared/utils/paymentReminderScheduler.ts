@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { MemberService } from '../../modules/members/service.ts';
 import { sendPushToMember } from './push.service.ts';
+import { sendPaymentDueReminderWhatsApp } from './whatsapp.service.ts';
  
 const service = new MemberService();
  
@@ -54,6 +55,11 @@ async function runReminderCheck(): Promise<void> {
             title: diffDays === 0 ? 'Instalment Due Today' : 'Instalment Due Soon',
             body: `Your ${inv.schemeType.toUpperCase()} instalment for ${monthLabel} is due ${diffDays === 0 ? 'today' : `on ${formatDueDate(dueDateThisMonth)}`}.`,
           }).catch((err: any) => console.error('[Push] Reminder push failed:', err.message));
+          sendPaymentDueReminderWhatsApp(
+            member,
+            inv,
+            diffDays === 0 ? 'today' : formatDueDate(dueDateThisMonth)
+          ).catch((err: any) => console.error('[WhatsApp] Reminder message failed:', err.message));
           remindersSent++;
         }
       }

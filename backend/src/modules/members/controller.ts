@@ -9,6 +9,7 @@ import {
   sendPaymentReceiptEmail,
 } from '../../shared/utils/email.service.ts';
 import { sendPushToMember } from '../../shared/utils/push.service.ts';
+import { sendPaymentReceivedWhatsApp } from '../../shared/utils/whatsapp.service.ts';
 const service = new MemberService();
 const jwtSecret = process.env.JWT_SECRET || 'nefc-secret-key-fallback-987654321';
  
@@ -104,6 +105,9 @@ export class MemberController {
               title: 'Payment Received',
               body: `Your instalment for ${latestMonth} has been confirmed. Thank you!`,
             }).catch((err: any) => console.error('[Push] Payment confirmed push failed:', err.message));
+            sendPaymentReceivedWhatsApp(updatedMember, inv, latestMonth).catch((err: any) =>
+              console.error('[WhatsApp] Payment received message failed:', err.message)
+            );
           }
         }
         // ───────────────────────────────────────────────────────────────────
