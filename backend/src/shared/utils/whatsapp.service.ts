@@ -1,25 +1,33 @@
 import { Member, MemberInvestment } from '../types/index.ts';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  WHATSAPP CLOUD API — sends templated messages via Meta's Graph API.
-//  Env vars required (set these in Railway → your service → Variables):
-//    WHATSAPP_TOKEN            → a PERMANENT token (create a System User in
-//                                Meta Business Settings → System Users →
-//                                generate token with whatsapp_business_messaging
-//                                + whatsapp_business_management permissions).
-//                                Do NOT use the 24-hour temporary token shown
-//                                on the "API Setup" dev console page — it
-//                                expires and the scheduler will silently stop
-//                                sending once it does.
-//    WHATSAPP_PHONE_NUMBER_ID  → the Phone Number ID from WhatsApp Manager
-//                                (e.g. 1188884857647084) — NOT the phone
-//                                number itself.
+//  AISENSY CAMPAIGN API — sends templated messages via AiSensy's backend,
+//  which sits in front of the WhatsApp Cloud API for you (no more calling
+//  graph.facebook.com directly).
 //
-//  IMPORTANT — Meta rule: you can only message a member first (i.e. they
-//  didn't message you) using a pre-approved MESSAGE TEMPLATE. Create + get
-//  ALL FIVE templates below approved in WhatsApp Manager → Manage templates
-//  BEFORE deploying this file, and keep the parameter ORDER in each function
-//  exactly matching what you submit for approval:
+//  Env vars required (set these in Railway → your service → Variables):
+//    AISENSY_API_KEY  → AiSensy dashboard → open your project → Manage page
+//                        → Copy API key. This REPLACES WHATSAPP_TOKEN and
+//                        WHATSAPP_PHONE_NUMBER_ID — you no longer need either.
+//
+//  IMPORTANT — AiSensy campaign setup: unlike raw Cloud API where you send
+//  a template by its literal name, AiSensy wraps each template in an
+//  "API Campaign" that you create in the dashboard and give a campaignName.
+//  For EACH of the 5 templates below:
+//    AiSensy → open project → Campaigns → Launch Campaign → API Campaign
+//    → select the approved WhatsApp template → name the campaign
+//      (recommended: reuse the same name, e.g. "welcome_member") → Set Live
+//  The campaignName strings below (WELCOME, INVESTMENT_UPDATE, etc.) must
+//  match EXACTLY what you typed as the Campaign Name in AiSensy — not
+//  necessarily the underlying WhatsApp template name.
+//
+//  IMPORTANT — Meta rule (unchanged): you can only message a member first
+//  (i.e. they didn't message you) using a pre-approved MESSAGE TEMPLATE.
+//  Create + get ALL FIVE templates below approved in AiSensy → Manage
+//  Templates BEFORE creating the API Campaigns, and keep the parameter
+//  ORDER in each function exactly matching what you submitted for approval —
+//  AiSensy sends params as a flat array (templateParams), and a mismatched
+//  length gets the whole request rejected:
 //
 //  1. Name: welcome_member   (Category: Utility, Language: English (US))
 //     🎉 *Welcome to NEFC Investment, {{1}}!*
@@ -91,7 +99,17 @@ import { Member, MemberInvestment } from '../types/index.ts';
 //     *NEFC Investment Team* 📣
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GRAPH_API_VERSION = 'v22.0';
+const AISENSY_API_URL = 'https://backend.aisensy.com/campaign/t1/api/v2';
+
+// campaignName values must match exactly what you named each API Campaign
+// in the AiSensy dashboard (see the header comment above).
+const CAMPAIGN = {
+  WELCOME: 'welcome_member',
+  INVESTMENT_UPDATE: 'investment_update',
+  PAYMENT_RECEIVED: 'payment_received',
+  PAYMENT_DUE_REMINDER: 'payment_due_reminder',
+  ANNOUNCEMENT: 'announcement',
+};
 
 function fmt(n: number): string {
   return n.toLocaleString('en-IN');
@@ -129,14 +147,14 @@ function toWhatsAppNumber(phone: string): string | null {
 
 async function sendTemplateMessage(
   toPhone: string,
-  templateName: string,
-  bodyParams: string[]
+  campaignName: string,
+  bodyParams: string[],
+  userName: string = 'Member' // AiSensy requires a userName; falls back if not passed
 ): Promise<void> {
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const apiKey = process.env.AISENSY_API_KEY;
 
-  if (!token || !phoneNumberId) {
-    console.error('[WhatsApp] Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID — skipping send.');
+  if (!apiKey) {
+    console.error('[WhatsApp] Missing AISENSY_API_KEY — skipping send.');
     return;
   }
 
@@ -144,31 +162,20 @@ async function sendTemplateMessage(
   if (!to) return;
 
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: 'en_US' },
-            components: [
-              {
-                type: 'body',
-                parameters: bodyParams.map(text => ({ type: 'text', text })),
-              },
-            ],
-          },
-        }),
-      }
-    );
+    const res = await fetch(AISENSY_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        apiKey,
+        campaignName,
+        destination: `+${to}`, // AiSensy expects E.164 with a leading "+"
+        userName,
+        source: 'nefc-backend',
+        templateParams: bodyParams,
+      }),
+    });
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
@@ -176,7 +183,7 @@ async function sendTemplateMessage(
       return;
     }
 
-    console.log(`✅ WhatsApp sent → ${to} (${templateName})`);
+    console.log(`✅ WhatsApp sent → ${to} (${campaignName})`);
   } catch (err: any) {
     console.error('[WhatsApp] Request error:', err.message);
   }
@@ -187,12 +194,12 @@ async function sendTemplateMessage(
 // ─────────────────────────────────────────────────────────────────────────────
 export async function sendWelcomeWhatsApp(member: Member): Promise<void> {
   if (!member.phone) return;
-  await sendTemplateMessage(member.phone, 'welcome_member', [
-    member.name,
-    member.id,
-    member.memberSince,
-    member.city,
-  ]);
+  await sendTemplateMessage(
+    member.phone,
+    CAMPAIGN.WELCOME,
+    [member.name, member.id, member.memberSince, member.city],
+    member.name
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -211,16 +218,21 @@ export async function sendInvestmentUpdateWhatsApp(
     ? calculateFDMaturity(investment.amount, investment.interestPct, investment.durationYears).maturityAmount
     : rdCalc.maturityAmount;
 
-  await sendTemplateMessage(member.phone, 'investment_update', [
-    member.name,
-    `${investment.schemeType.toUpperCase()} — ${investment.durationYears} Year(s)`,
-    fmt(investment.amount),
-    fmt(totalDeposit),
-    investment.startDate,
-    investment.maturityDate,
-    fmt(maturityAmount),
-    investment.status,
-  ]);
+  await sendTemplateMessage(
+    member.phone,
+    CAMPAIGN.INVESTMENT_UPDATE,
+    [
+      member.name,
+      `${investment.schemeType.toUpperCase()} — ${investment.durationYears} Year(s)`,
+      fmt(investment.amount),
+      fmt(totalDeposit),
+      investment.startDate,
+      investment.maturityDate,
+      fmt(maturityAmount),
+      investment.status,
+    ],
+    member.name
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,13 +244,12 @@ export async function sendPaymentReceivedWhatsApp(
   month: string // e.g. "June 2026"
 ): Promise<void> {
   if (!member.phone) return;
-  await sendTemplateMessage(member.phone, 'payment_received', [
-    member.name,
-    month,
-    investment.schemeType.toUpperCase(),
-    fmt(investment.amount),
-    month,
-  ]);
+  await sendTemplateMessage(
+    member.phone,
+    CAMPAIGN.PAYMENT_RECEIVED,
+    [member.name, month, investment.schemeType.toUpperCase(), fmt(investment.amount), month],
+    member.name
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,12 +261,12 @@ export async function sendPaymentDueReminderWhatsApp(
   dueDateLabel: string // e.g. "8 Aug 2026"
 ): Promise<void> {
   if (!member.phone) return;
-  await sendTemplateMessage(member.phone, 'payment_due_reminder', [
-    member.name,
-    investment.schemeType.toUpperCase(),
-    fmt(investment.amount),
-    dueDateLabel,
-  ]);
+  await sendTemplateMessage(
+    member.phone,
+    CAMPAIGN.PAYMENT_DUE_REMINDER,
+    [member.name, investment.schemeType.toUpperCase(), fmt(investment.amount), dueDateLabel],
+    member.name
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -273,7 +284,7 @@ export async function sendAnnouncementWhatsApp(
   if (recipients.length === 0) return;
 
   const results = await Promise.allSettled(
-    recipients.map(m => sendTemplateMessage(m.phone, 'announcement', [text]))
+    recipients.map(m => sendTemplateMessage(m.phone, CAMPAIGN.ANNOUNCEMENT, [text], m.name))
   );
 
   const failed = results.filter(r => r.status === 'rejected').length;
