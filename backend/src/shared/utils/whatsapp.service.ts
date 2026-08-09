@@ -273,7 +273,7 @@ export async function sendAnnouncementWhatsApp(
   if (recipients.length === 0) return;
 
   const results = await Promise.allSettled(
-    recipients.map(m => sendTemplateMessage(m.phone, 'announcement', [text]))
+    recipients.map(m => sendTemplateMessage(m.phone, 'announcement offf', [text]))
   );
 
   const failed = results.filter(r => r.status === 'rejected').length;
