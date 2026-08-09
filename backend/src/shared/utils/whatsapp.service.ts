@@ -187,8 +187,11 @@ async function sendTemplateMessage(
 // ─────────────────────────────────────────────────────────────────────────────
 export async function sendWelcomeWhatsApp(member: Member): Promise<void> {
   if (!member.phone) return;
-  await sendTemplateMessage(member.phone, 'hello_world', [
-    
+  await sendTemplateMessage(member.phone, 'welcome_member', [
+    member.name,
+    member.id,
+    member.memberSince,
+    member.city,
   ]);
 }
 
