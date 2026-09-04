@@ -11,12 +11,12 @@ export class AnnouncementService {
     return data.announcement || '';
   }
 
-  async setAnnouncement(text: string): Promise<string> {
+  async setAnnouncement(text: string, sendWhatsapp: boolean = false): Promise<string> {
     const announcementVal = text || '';
     await supabase.from('site_settings').upsert({ key: 'announcement', value: announcementVal });
 
-    // Push the announcement to every active member's phone as well, so it
-    // isn't only visible to people who happen to open the website.
+    // Push notifications still go out to every active member whenever the
+    // banner is set — this is silent/free and low-annoyance.
     if (announcementVal.trim()) {
       const members = await memberService.getAllMembers();
       const activeMembers = members.filter(m => m.status === 'Active');
@@ -27,9 +27,14 @@ export class AnnouncementService {
         body: announcementVal,
       }).catch(err => console.error('[Push] Announcement broadcast failed:', err.message));
 
-      sendAnnouncementWhatsApp(activeMembers, announcementVal).catch(err =>
-        console.error('[WhatsApp] Announcement broadcast failed:', err.message)
-      );
+      // WhatsApp broadcast is OPT-IN per publish — only fires when the admin
+      // explicitly ticks "Also send via WhatsApp" on the Announcements page,
+      // since each send costs money / uses up template-messaging quota.
+      if (sendWhatsapp) {
+        sendAnnouncementWhatsApp(activeMembers, announcementVal).catch(err =>
+          console.error('[WhatsApp] Announcement broadcast failed:', err.message)
+        );
+      }
     }
 
     return announcementVal;

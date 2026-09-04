@@ -165,6 +165,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   const [heroForm, setHeroForm] = useState({ ...siteData.hero });
   const [companyForm, setCompanyForm] = useState({ ...siteData.company });
   const [announcementText, setAnnouncementText] = useState<string>(siteData.announcement || '');
+  const [sendAnnouncementWhatsapp, setSendAnnouncementWhatsapp] = useState<boolean>(false);
   const [adminPassForm, setAdminPassForm] = useState({ newPass: '', confirmPass: '' });
 
   // OTP password verification states
@@ -860,12 +861,15 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
           'Content-Type': 'application/json',
           'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
         },
-        body: JSON.stringify({ text: announcementText }),
+        body: JSON.stringify({ text: announcementText, sendWhatsapp: sendAnnouncementWhatsapp }),
       });
       const data = await response.json();
       if (data.success) {
         await onUpdateData({ ...siteData, announcement: data.announcement || '' });
-        triggerToast('Announcement updated', 'success');
+        triggerToast(
+          sendAnnouncementWhatsapp ? 'Announcement updated & WhatsApp sent' : 'Announcement updated',
+          'success'
+        );
       } else {
         triggerToast(data.error || 'Failed to save announcement', 'error');
       }
@@ -884,11 +888,12 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
           'Content-Type': 'application/json',
           'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
         },
-        body: JSON.stringify({ text: '' }),
+        body: JSON.stringify({ text: '', sendWhatsapp: false }),
       });
       const data = await response.json();
       if (data.success) {
         setAnnouncementText('');
+        setSendAnnouncementWhatsapp(false);
         await onUpdateData({ ...siteData, announcement: '' });
         triggerToast('Announcement banner disabled', 'success');
       } else {
@@ -2404,12 +2409,25 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   />
                 </div>
 
+                <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={sendAnnouncementWhatsapp}
+                    onChange={(e) => setSendAnnouncementWhatsapp(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-600">
+                    <span className="font-semibold text-slate-800">Also send via WhatsApp</span> to every active member.
+                    Leave unchecked to only update the banner shown on the site.
+                  </span>
+                </label>
+
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={handleSaveAnnouncement}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-xl cursor-pointer"
                   >
-                    Publish alert
+                    {sendAnnouncementWhatsapp ? 'Publish alert & send WhatsApp' : 'Publish alert'}
                   </button>
                   <button
                     onClick={handleClearAnnouncement}
