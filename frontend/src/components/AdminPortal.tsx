@@ -58,6 +58,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   // Search & Filter
   const [memberSearch, setMemberSearch] = useState<string>('');
   const [memberFilter, setMemberFilter] = useState<string>('');
+  const [memberSchemeFilter, setMemberSchemeFilter] = useState<string>('');
 
   // Modals
   const [showMemberModal, setShowMemberModal] = useState<boolean>(false);
@@ -993,7 +994,22 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     const matchQuery = m.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
                        m.id.toLowerCase().includes(memberSearch.toLowerCase());
     const matchFilter = memberFilter === '' ? true : m.status === memberFilter;
-    return matchQuery && matchFilter;
+
+    // Scheme filter: does this member hold FD only, RD only, or Both?
+    const hasFD = (m.investments ?? []).some(inv => inv.schemeType === 'fd');
+    const hasRD = (m.investments ?? []).some(inv => inv.schemeType === 'rd');
+    let matchScheme = true;
+    if (memberSchemeFilter === 'fd') {
+      matchScheme = hasFD && !hasRD;
+    } else if (memberSchemeFilter === 'rd') {
+      matchScheme = hasRD && !hasFD;
+    } else if (memberSchemeFilter === 'both') {
+      matchScheme = hasFD && hasRD;
+    } else if (memberSchemeFilter === 'none') {
+      matchScheme = !hasFD && !hasRD;
+    }
+
+    return matchQuery && matchFilter && matchScheme;
   });
 
   // Calculate Metrics totals for Admin overview pane
@@ -1513,6 +1529,20 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                       <option value="">All Statuses Models</option>
                       <option value="Active">Active Models Only</option>
                       <option value="Inactive">Suspended Accounts Only</option>
+                    </select>
+                    <select
+                      value={memberSchemeFilter}
+                      onChange={(e) => {
+                        setMemberSchemeFilter(e.target.value);
+                        setMembersPage(1); // Reset to first page
+                      }}
+                      className="px-3 py-2 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:border-blue-500"
+                    >
+                      <option value="">All Schemes</option>
+                      <option value="fd">FD Only</option>
+                      <option value="rd">RD Only</option>
+                      <option value="both">Both FD &amp; RD</option>
+                      <option value="none">No Active Scheme</option>
                     </select>
                   </div>
 
