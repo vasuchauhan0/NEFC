@@ -28,6 +28,8 @@ app.use(cors({
     'https://nefc-ten.vercel.app',
     'https://nefc.online',
     'https://www.nefc.online',
+    'https://nefc.in',
+    'https://www.nefc.in',
   ],
   credentials: true,
 }));
