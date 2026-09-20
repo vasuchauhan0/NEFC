@@ -173,6 +173,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   const [announcementImageFile, setAnnouncementImageFile] = useState<File | null>(null);
   const [announcementImagePreview, setAnnouncementImagePreview] = useState<string>('');
   const [uploadingAnnouncementImage, setUploadingAnnouncementImage] = useState<boolean>(false);
+  const [announcementRecipientMode, setAnnouncementRecipientMode] = useState<'all' | 'selected'>('all');
+  const [selectedAnnouncementMemberIds, setSelectedAnnouncementMemberIds] = useState<string[]>([]);
+  const [announcementMemberPickerSearch, setAnnouncementMemberPickerSearch] = useState<string>('');
   const [adminPassForm, setAdminPassForm] = useState({ newPass: '', confirmPass: '' });
 
   // OTP password verification states
@@ -888,8 +891,26 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
     setAnnouncementImagePreview(URL.createObjectURL(file));
   };
 
+  const handleToggleAnnouncementMember = (memberId: string) => {
+    setSelectedAnnouncementMemberIds(prev =>
+      prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId]
+    );
+  };
+
   const handleSaveAnnouncement = async () => {
     try {
+      // Guard: "specific people" mode with nothing picked and no numbers
+      // typed would silently send to nobody — catch it before we upload
+      // an image or hit the server at all.
+      if (
+        announcementRecipientMode === 'selected' &&
+        selectedAnnouncementMemberIds.length === 0 &&
+        extraPhoneNumbers.length === 0
+      ) {
+        triggerToast('Select at least one member or add a phone number first', 'error');
+        return;
+      }
+
       const API = import.meta.env.VITE_API_URL || '';
       const needsImage =
         sendAnnouncementWhatsapp && (announcementMsgType === 'image' || announcementMsgType === 'imageText');
@@ -930,15 +951,21 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
           sendWhatsapp: sendAnnouncementWhatsapp,
           extraPhones: sendAnnouncementWhatsapp ? extraPhoneNumbers : [],
           imageUrl,
+          recipientMode: announcementRecipientMode,
+          selectedMemberIds: announcementRecipientMode === 'selected' ? selectedAnnouncementMemberIds : [],
         }),
       });
       const data = await response.json();
       if (data.success) {
         await onUpdateData({ ...siteData, announcement: data.announcement || '' });
         const extraCount = sendAnnouncementWhatsapp ? extraPhoneNumbers.length : 0;
+        const audienceLabel =
+          announcementRecipientMode === 'selected'
+            ? `${selectedAnnouncementMemberIds.length} selected member${selectedAnnouncementMemberIds.length === 1 ? '' : 's'}${extraCount > 0 ? ` + ${extraCount} number${extraCount === 1 ? '' : 's'}` : ''}`
+            : `all active members${extraCount > 0 ? ` + ${extraCount} custom number${extraCount === 1 ? '' : 's'}` : ''}`;
         triggerToast(
           sendAnnouncementWhatsapp
-            ? `Announcement updated & WhatsApp sent${extraCount > 0 ? ` (+${extraCount} custom number${extraCount === 1 ? '' : 's'})` : ''}`
+            ? `Announcement updated & WhatsApp sent to ${audienceLabel}`
             : 'Announcement updated',
           'success'
         );
@@ -972,6 +999,9 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
         setAnnouncementMsgType('text');
         setAnnouncementImageFile(null);
         setAnnouncementImagePreview('');
+        setAnnouncementRecipientMode('all');
+        setSelectedAnnouncementMemberIds([]);
+        setAnnouncementMemberPickerSearch('');
         await onUpdateData({ ...siteData, announcement: '' });
         triggerToast('Announcement banner disabled', 'success');
       } else {
@@ -2516,6 +2546,88 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   />
                 </div>
 
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                    Send to
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementRecipientMode('all')}
+                      className={`text-xs font-semibold px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        announcementRecipientMode === 'all'
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                      }`}
+                    >
+                      All active members
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementRecipientMode('selected')}
+                      className={`text-xs font-semibold px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        announcementRecipientMode === 'selected'
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                      }`}
+                    >
+                      Specific person(s)
+                    </button>
+                  </div>
+
+                  {announcementRecipientMode === 'selected' && (
+                    <div className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <input
+                        type="text"
+                        value={announcementMemberPickerSearch}
+                        onChange={(e) => setAnnouncementMemberPickerSearch(e.target.value)}
+                        placeholder="Search members by name or phone..."
+                        className="w-full px-3 py-2 border border-slate-200 bg-white text-slate-800 rounded-lg text-xs"
+                      />
+
+                      <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+                        {safeData.members
+                          .filter((m: Member) => {
+                            const q = announcementMemberPickerSearch.trim().toLowerCase();
+                            if (!q) return true;
+                            return (
+                              (m.name || '').toLowerCase().includes(q) ||
+                              (m.phone || '').toLowerCase().includes(q)
+                            );
+                          })
+                          .slice(0, 200)
+                          .map((m: Member) => (
+                            <label
+                              key={m.id}
+                              className="flex items-center gap-2 px-3 py-2 text-xs cursor-pointer hover:bg-slate-50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedAnnouncementMemberIds.includes(m.id)}
+                                onChange={() => handleToggleAnnouncementMember(m.id)}
+                                className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                              <span className="font-medium text-slate-800">{m.name}</span>
+                              <span className="text-slate-400">{m.phone}</span>
+                            </label>
+                          ))}
+                        {safeData.members.length === 0 && (
+                          <p className="px-3 py-2 text-[11px] text-slate-400">No members found.</p>
+                        )}
+                      </div>
+
+                      {selectedAnnouncementMemberIds.length > 0 && (
+                        <p className="text-[11px] text-slate-500">
+                          {selectedAnnouncementMemberIds.length} member{selectedAnnouncementMemberIds.length === 1 ? '' : 's'} selected.
+                        </p>
+                      )}
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Not a member yet? Scroll down to "Also advertise to other numbers" to add their number directly instead.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
                   <input
                     type="checkbox"
@@ -2524,7 +2636,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span className="text-xs text-slate-600">
-                    <span className="font-semibold text-slate-800">Also send via WhatsApp</span> to every active member.
+                    <span className="font-semibold text-slate-800">Also send via WhatsApp</span> to the audience selected above.
                     Leave unchecked to only update the banner shown on the site.
                   </span>
                 </label>

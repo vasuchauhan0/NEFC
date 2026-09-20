@@ -9,7 +9,7 @@ const service = new AnnouncementService();
 export class AnnouncementController {
   async setAnnouncement(req: Request, res: Response): Promise<void> {
     try {
-      const { text, sendWhatsapp, extraPhones, imageUrl } = req.body;
+      const { text, sendWhatsapp, extraPhones, imageUrl, recipientMode, selectedMemberIds } = req.body;
 
       // Sanitize: only keep non-empty strings, cap the list so a bad paste
       // can't trigger a huge accidental broadcast.
@@ -25,11 +25,22 @@ export class AnnouncementController {
       const cleanedImageUrl: string =
         typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl.trim()) ? imageUrl.trim() : '';
 
+      const cleanedRecipientMode: 'all' | 'selected' = recipientMode === 'selected' ? 'selected' : 'all';
+
+      const cleanedSelectedMemberIds: string[] = Array.isArray(selectedMemberIds)
+        ? selectedMemberIds
+            .filter((id: unknown) => typeof id === 'string' && id.trim().length > 0)
+            .map((id: string) => id.trim())
+            .slice(0, 1000)
+        : [];
+
       const announcement = await service.setAnnouncement(
         text,
         !!sendWhatsapp,
         cleanedExtraPhones,
-        cleanedImageUrl
+        cleanedImageUrl,
+        cleanedRecipientMode,
+        cleanedSelectedMemberIds
       );
       res.json({ success: true, announcement });
     } catch (error) {

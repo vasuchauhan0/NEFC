@@ -36,19 +36,30 @@ export class AnnouncementService {
     text: string,
     sendWhatsapp: boolean = false,
     extraPhones: string[] = [],
-    imageUrl: string = ''
+    imageUrl: string = '',
+    recipientMode: 'all' | 'selected' = 'all',
+    selectedMemberIds: string[] = []
   ): Promise<string> {
     const announcementVal = text || '';
     await supabase.from('site_settings').upsert({ key: 'announcement', value: announcementVal });
 
-    // Push notifications still go out to every active member whenever the
-    // banner is set — this is silent/free and low-annoyance. Push has no
-    // image support here, so it only fires when there's actual banner text.
-    if (announcementVal.trim()) {
-      const members = await memberService.getAllMembers();
-      const activeMemberIds = members.filter(m => m.status === 'Active').map(m => m.id);
+    const members = await memberService.getAllMembers();
 
-      sendPushToAllMembers(activeMemberIds, {
+    // Who counts as a "member recipient" for this send:
+    //  - 'all'      → every Active member (the original broadcast behaviour)
+    //  - 'selected' → only the specific member(s) the admin picked in the UI
+    // Either way, hand-typed numbers (extraPhones) are added on top for WhatsApp.
+    const targetMembers =
+      recipientMode === 'selected'
+        ? members.filter(m => selectedMemberIds.includes(m.id))
+        : members.filter(m => m.status === 'Active');
+
+    // Push notifications go to whichever members are targeted above — this
+    // is silent/free and low-annoyance. Push has no image support here, and
+    // no way to reach a raw phone number (extraPhones), so it only fires
+    // when there's banner text and at least one targeted member.
+    if (announcementVal.trim() && targetMembers.length > 0) {
+      sendPushToAllMembers(targetMembers.map(m => m.id), {
         title: 'NEFC Announcement',
         body: announcementVal,
       }).catch(err => console.error('[Push] Announcement broadcast failed:', err.message));
@@ -59,12 +70,13 @@ export class AnnouncementService {
     // since each send costs money / uses up template-messaging quota.
     // Unlike push, this can fire on an image-only send with no banner text.
     if (sendWhatsapp && (announcementVal.trim() || imageUrl)) {
-      const members = await memberService.getAllMembers();
-      const activeMembers = members.filter(m => m.status === 'Active');
-      const memberPhones = activeMembers.map(m => m.phone).filter(Boolean) as string[];
+      const memberPhones = targetMembers.map(m => m.phone).filter(Boolean) as string[];
 
-      // Member phones + hand-typed prospect numbers, deduped into one list —
-      // whichever template fires below goes out to everyone in one shot.
+      // Targeted member phones + hand-typed prospect numbers, deduped into
+      // one list — whichever template fires below goes out to everyone in
+      // one shot. When recipientMode is 'selected' and no members were
+      // picked, this collapses to just the typed numbers — i.e. a send to
+      // one or a handful of specific people only.
       const allPhones = Array.from(new Set([...memberPhones, ...(extraPhones || [])]));
 
       if (allPhones.length > 0) {
