@@ -89,6 +89,28 @@ import { Member, MemberInvestment } from '../types/index.ts';
 //     {{1}}
 //
 //     *NEFC Investment Team* 📣
+//
+//  6. Name: announcement_image   (Category: MARKETING, Language: English (US))
+//     Header type: IMAGE (when submitting for approval, Meta asks you to
+//     attach a SAMPLE image — any placeholder image works, the real image is
+//     swapped in per-send via the "link" you pass at send time).
+//     Body:
+//     📢 *NEFC Announcement*
+//
+//     *NEFC Investment Team* 📣
+//     (No body variables — this template is image-only, so there is nothing
+//     for the admin to type per-send besides picking/uploading the image.)
+//
+//  7. Name: announcement_image_text   (Category: MARKETING, Language: English (US))
+//     Header type: IMAGE (same as above — attach any sample image on submission).
+//     Body:
+//     📢 *NEFC Announcement*
+//
+//     {{1}}
+//
+//     *NEFC Investment Team* 📣
+//     (One body variable — the admin's typed announcement text goes here,
+//     the image goes in the header.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GRAPH_API_VERSION = 'v22.0';
@@ -130,7 +152,8 @@ function toWhatsAppNumber(phone: string): string | null {
 async function sendTemplateMessage(
   toPhone: string,
   templateName: string,
-  bodyParams: string[]
+  bodyParams: string[],
+  imageLink?: string
 ): Promise<void> {
   const token = process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -142,6 +165,24 @@ async function sendTemplateMessage(
 
   const to = toWhatsAppNumber(toPhone);
   if (!to) return;
+
+  // Build components: an IMAGE header (when a link is supplied) and/or a
+  // BODY with text parameters (when the template has variables). A template
+  // like "announcement_image" has no body variables, so bodyParams is empty
+  // and only the header component is sent.
+  const components: Record<string, unknown>[] = [];
+  if (imageLink) {
+    components.push({
+      type: 'header',
+      parameters: [{ type: 'image', image: { link: imageLink } }],
+    });
+  }
+  if (bodyParams.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: bodyParams.map(text => ({ type: 'text', text })),
+    });
+  }
 
   try {
     const res = await fetch(
@@ -159,12 +200,7 @@ async function sendTemplateMessage(
           template: {
             name: templateName,
             language: { code: 'en_US' },
-            components: [
-              {
-                type: 'body',
-                parameters: bodyParams.map(text => ({ type: 'text', text })),
-              },
-            ],
+            components,
           },
         }),
       }
@@ -279,5 +315,77 @@ export async function sendAnnouncementWhatsApp(
   const failed = results.filter(r => r.status === 'rejected').length;
   if (failed > 0) {
     console.error(`[WhatsApp] Announcement broadcast: ${failed}/${recipients.length} sends failed.`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  6. ANNOUNCEMENT BROADCAST TO RAW NUMBERS — same "announcement" template as
+//     above, but for arbitrary phone numbers the admin types in by hand
+//     (prospects / non-members), instead of pulling from the members table.
+//     Called from announcements/service.ts when the admin supplies an
+//     `extraPhones` list alongside (or instead of) the member broadcast.
+//     NOTE: these numbers have not necessarily opted in — Meta's Marketing
+//     template rules technically require opt-in, so heavy use on cold numbers
+//     can hurt the WhatsApp Business Account's quality rating over time.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function sendAnnouncementWhatsAppToNumbers(
+  phones: string[],
+  text: string
+): Promise<void> {
+  const recipients = Array.from(new Set((phones || []).map(p => (p || '').trim()).filter(Boolean)));
+  if (recipients.length === 0) return;
+
+  const results = await Promise.allSettled(
+    recipients.map(phone => sendTemplateMessage(phone, 'announcement', [text]))
+  );
+
+  const failed = results.filter(r => r.status === 'rejected').length;
+  if (failed > 0) {
+    console.error(`[WhatsApp] Announcement (custom numbers) broadcast: ${failed}/${recipients.length} sends failed.`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  7. ANNOUNCEMENT BROADCAST — IMAGE ONLY — uses the "announcement_image"
+//     template (header: image, no body variables). `imageUrl` must be a
+//     public HTTPS link (Meta fetches it directly) — a signed/private URL
+//     or localhost link will fail silently on Meta's side.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function sendAnnouncementImageWhatsApp(
+  phones: string[],
+  imageUrl: string
+): Promise<void> {
+  const recipients = Array.from(new Set((phones || []).map(p => (p || '').trim()).filter(Boolean)));
+  if (recipients.length === 0 || !imageUrl) return;
+
+  const results = await Promise.allSettled(
+    recipients.map(phone => sendTemplateMessage(phone, 'announcement_image', [], imageUrl))
+  );
+
+  const failed = results.filter(r => r.status === 'rejected').length;
+  if (failed > 0) {
+    console.error(`[WhatsApp] Announcement (image) broadcast: ${failed}/${recipients.length} sends failed.`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  8. ANNOUNCEMENT BROADCAST — IMAGE + TEXT — uses the "announcement_image_text"
+//     template (header: image, body: {{1}} = the admin's typed text).
+// ─────────────────────────────────────────────────────────────────────────────
+export async function sendAnnouncementImageTextWhatsApp(
+  phones: string[],
+  imageUrl: string,
+  text: string
+): Promise<void> {
+  const recipients = Array.from(new Set((phones || []).map(p => (p || '').trim()).filter(Boolean)));
+  if (recipients.length === 0 || !imageUrl) return;
+
+  const results = await Promise.allSettled(
+    recipients.map(phone => sendTemplateMessage(phone, 'announcement_image_text', [text], imageUrl))
+  );
+
+  const failed = results.filter(r => r.status === 'rejected').length;
+  if (failed > 0) {
+    console.error(`[WhatsApp] Announcement (image+text) broadcast: ${failed}/${recipients.length} sends failed.`);
   }
 }

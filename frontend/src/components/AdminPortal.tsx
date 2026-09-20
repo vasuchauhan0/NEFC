@@ -167,6 +167,12 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   const [companyForm, setCompanyForm] = useState({ ...siteData.company });
   const [announcementText, setAnnouncementText] = useState<string>(siteData.announcement || '');
   const [sendAnnouncementWhatsapp, setSendAnnouncementWhatsapp] = useState<boolean>(false);
+  const [extraPhoneNumbers, setExtraPhoneNumbers] = useState<string[]>([]);
+  const [extraPhoneInput, setExtraPhoneInput] = useState<string>('');
+  const [announcementMsgType, setAnnouncementMsgType] = useState<'text' | 'image' | 'imageText'>('text');
+  const [announcementImageFile, setAnnouncementImageFile] = useState<File | null>(null);
+  const [announcementImagePreview, setAnnouncementImagePreview] = useState<string>('');
+  const [uploadingAnnouncementImage, setUploadingAnnouncementImage] = useState<boolean>(false);
   const [adminPassForm, setAdminPassForm] = useState({ newPass: '', confirmPass: '' });
 
   // OTP password verification states
@@ -853,22 +859,87 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   };
 
   // OTHER ADMIN WRITES
+
+  // Splits on commas, spaces, and newlines so pasting a whole list at once
+  // (from Excel, WhatsApp, wherever) works, not just one number at a time.
+  const handleAddExtraPhones = () => {
+    const parts = extraPhoneInput
+      .split(/[,\s]+/)
+      .map(p => p.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+
+    setExtraPhoneNumbers(prev => {
+      const merged = new Set(prev);
+      parts.forEach(p => merged.add(p));
+      return Array.from(merged);
+    });
+    setExtraPhoneInput('');
+  };
+
+  const handleRemoveExtraPhone = (phone: string) => {
+    setExtraPhoneNumbers(prev => prev.filter(p => p !== phone));
+  };
+
+  const handleAnnouncementImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAnnouncementImageFile(file);
+    setAnnouncementImagePreview(URL.createObjectURL(file));
+  };
+
   const handleSaveAnnouncement = async () => {
     try {
       const API = import.meta.env.VITE_API_URL || '';
+      const needsImage =
+        sendAnnouncementWhatsapp && (announcementMsgType === 'image' || announcementMsgType === 'imageText');
+
+      // Image-bearing sends need a hosted URL before we can call setAnnouncement,
+      // so upload the picked file first and use the URL it hands back.
+      let imageUrl = '';
+      if (needsImage) {
+        if (!announcementImageFile) {
+          triggerToast('Please choose an image first', 'error');
+          return;
+        }
+        setUploadingAnnouncementImage(true);
+        const formData = new FormData();
+        formData.append('image', announcementImageFile);
+        const uploadRes = await fetch(`${API}/api/announcement/image`, {
+          method: 'POST',
+          headers: { 'x-admin-token': localStorage.getItem('nefc_admin_token') || '' },
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+        setUploadingAnnouncementImage(false);
+        if (!uploadData.success) {
+          triggerToast(uploadData.error || 'Image upload failed', 'error');
+          return;
+        }
+        imageUrl = uploadData.imageUrl;
+      }
+
       const response = await fetch(`${API}/api/announcement`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
         },
-        body: JSON.stringify({ text: announcementText, sendWhatsapp: sendAnnouncementWhatsapp }),
+        body: JSON.stringify({
+          text: announcementText,
+          sendWhatsapp: sendAnnouncementWhatsapp,
+          extraPhones: sendAnnouncementWhatsapp ? extraPhoneNumbers : [],
+          imageUrl,
+        }),
       });
       const data = await response.json();
       if (data.success) {
         await onUpdateData({ ...siteData, announcement: data.announcement || '' });
+        const extraCount = sendAnnouncementWhatsapp ? extraPhoneNumbers.length : 0;
         triggerToast(
-          sendAnnouncementWhatsapp ? 'Announcement updated & WhatsApp sent' : 'Announcement updated',
+          sendAnnouncementWhatsapp
+            ? `Announcement updated & WhatsApp sent${extraCount > 0 ? ` (+${extraCount} custom number${extraCount === 1 ? '' : 's'})` : ''}`
+            : 'Announcement updated',
           'success'
         );
       } else {
@@ -876,6 +947,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       }
     } catch (err) {
       console.error('Failed to update announcement:', err);
+      setUploadingAnnouncementImage(false);
       triggerToast('Server connection failed', 'error');
     }
   };
@@ -895,6 +967,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       if (data.success) {
         setAnnouncementText('');
         setSendAnnouncementWhatsapp(false);
+        setExtraPhoneNumbers([]);
+        setExtraPhoneInput('');
+        setAnnouncementMsgType('text');
+        setAnnouncementImageFile(null);
+        setAnnouncementImagePreview('');
         await onUpdateData({ ...siteData, announcement: '' });
         triggerToast('Announcement banner disabled', 'success');
       } else {
@@ -2452,12 +2529,136 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   </span>
                 </label>
 
+                {sendAnnouncementWhatsapp && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      WhatsApp message type
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { key: 'text', label: 'Text only' },
+                        { key: 'image', label: 'Image only' },
+                        { key: 'imageText', label: 'Image + Text' },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setAnnouncementMsgType(opt.key)}
+                          className={`text-[11px] font-semibold px-2.5 py-2 rounded-lg border cursor-pointer transition-colors ${
+                            announcementMsgType === opt.key
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {(announcementMsgType === 'image' || announcementMsgType === 'imageText') && (
+                      <div className="pt-1 space-y-2">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                          Image to send
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAnnouncementImageSelect}
+                          className="block w-full text-[11px] text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-white file:text-[11px] file:font-medium cursor-pointer"
+                        />
+                        {announcementImagePreview && (
+                          <img
+                            src={announcementImagePreview}
+                            alt="Announcement preview"
+                            className="h-28 w-auto rounded-lg border border-slate-200 object-cover"
+                          />
+                        )}
+                        <p className="text-[11px] text-slate-500">
+                          {announcementMsgType === 'image'
+                            ? 'Sent with no caption — the "Banner notification text" above still updates the website banner separately.'
+                            : 'The "Banner notification text" above is sent as the caption under the image.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {sendAnnouncementWhatsapp && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      <Phone size={12} className="text-blue-500" />
+                      Also advertise to other numbers (non-members)
+                    </label>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Add any phone numbers here — they don't need to be members. They'll get this same
+                      message on WhatsApp. Paste a list separated by commas, spaces, or new lines, or add one at a time.
+                    </p>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={extraPhoneInput}
+                        onChange={(e) => setExtraPhoneInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddExtraPhones();
+                          }
+                        }}
+                        placeholder="e.g. 9876543210, 9123456780"
+                        className="flex-1 px-3 py-2 border border-slate-200 bg-white text-slate-800 rounded-lg text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddExtraPhones}
+                        className="flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white font-medium text-xs px-3 py-2 rounded-lg cursor-pointer"
+                      >
+                        <Plus size={13} />
+                        Add
+                      </button>
+                    </div>
+
+                    {extraPhoneNumbers.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {extraPhoneNumbers.map((phone) => (
+                          <span
+                            key={phone}
+                            className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-700 text-[11px] font-medium pl-2.5 pr-1.5 py-1 rounded-full"
+                          >
+                            {phone}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExtraPhone(phone)}
+                              className="hover:bg-blue-100 rounded-full p-0.5 cursor-pointer"
+                              aria-label={`Remove ${phone}`}
+                            >
+                              <X size={11} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {extraPhoneNumbers.length > 0 && (
+                      <p className="text-[11px] text-slate-500 pt-0.5">
+                        {extraPhoneNumbers.length} custom number{extraPhoneNumbers.length === 1 ? '' : 's'} will
+                        receive this alert in addition to your members.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={handleSaveAnnouncement}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-xl cursor-pointer"
+                    disabled={uploadingAnnouncementImage}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-xs px-4 py-2 rounded-xl cursor-pointer"
                   >
-                    {sendAnnouncementWhatsapp ? 'Publish alert & send WhatsApp' : 'Publish alert'}
+                    {uploadingAnnouncementImage
+                      ? 'Uploading image…'
+                      : sendAnnouncementWhatsapp
+                      ? 'Publish alert & send WhatsApp'
+                      : 'Publish alert'}
                   </button>
                   <button
                     onClick={handleClearAnnouncement}
