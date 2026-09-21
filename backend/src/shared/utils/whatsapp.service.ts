@@ -119,6 +119,24 @@ function fmt(n: number): string {
   return n.toLocaleString('en-IN');
 }
 
+// WhatsApp template BODY parameters cannot contain newline/tab characters
+// or more than 4 consecutive spaces (Meta error #132018: "Param text
+// cannot have new-line/tab characters or more than 4 consecutive spaces").
+// This mainly bites free-typed admin text (announcements) — copy-pasted
+// text often carries hidden line breaks or tabs — but it's applied to
+// every param here as cheap insurance since it's a no-op on clean text.
+function sanitizeParam(text: string): string {
+  return (text ?? '')
+    .toString()
+    .replace(/[\r\n\t]+/g, ' ') // newlines/tabs → single space
+    .replace(/ {2,}/g, ' ')     // collapse runs of 2+ spaces to 1
+    .trim();
+}
+
+function sanitizeParams(params: string[]): string[] {
+  return params.map(sanitizeParam);
+}
+
 // Same maturity math used elsewhere in the app, so the numbers WhatsApp
 // shows always match what's on the site/email.
 function calculateFDMaturity(principal: number, annualRate: number, years: number) {
@@ -166,6 +184,10 @@ async function sendTemplateMessage(
   const to = toWhatsAppNumber(toPhone);
   if (!to) return;
 
+  // Sanitize every body param here too (belt-and-braces, in case a caller
+  // is ever added later that forgets to sanitize before calling this).
+  const safeParams = sanitizeParams(bodyParams);
+
   // Build components: an IMAGE header (when a link is supplied) and/or a
   // BODY with text parameters (when the template has variables). A template
   // like "announcement_image" has no body variables, so bodyParams is empty
@@ -177,10 +199,10 @@ async function sendTemplateMessage(
       parameters: [{ type: 'image', image: { link: imageLink } }],
     });
   }
-  if (bodyParams.length > 0) {
+  if (safeParams.length > 0) {
     components.push({
       type: 'body',
-      parameters: bodyParams.map(text => ({ type: 'text', text })),
+      parameters: safeParams.map(text => ({ type: 'text', text })),
     });
   }
 
@@ -300,6 +322,10 @@ export async function sendPaymentDueReminderWhatsApp(
 //     passed in (filter to Active members before calling this).
 //     Sent in parallel with Promise.allSettled so one bad phone number
 //     doesn't block the rest of the broadcast.
+//
+//     `text` is free-typed by the admin (often copy-pasted), so it's the
+//     most likely source of the #132018 "new-line/tab or 4+ spaces" error —
+//     sanitized here before it's used for every recipient.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function sendAnnouncementWhatsApp(
   members: Member[],
@@ -308,8 +334,10 @@ export async function sendAnnouncementWhatsApp(
   const recipients = members.filter(m => m.phone);
   if (recipients.length === 0) return;
 
+  const safeText = sanitizeParam(text);
+
   const results = await Promise.allSettled(
-    recipients.map(m => sendTemplateMessage(m.phone, 'announcement', [text]))
+    recipients.map(m => sendTemplateMessage(m.phone, 'announcement', [safeText]))
   );
 
   const failed = results.filter(r => r.status === 'rejected').length;
@@ -335,8 +363,10 @@ export async function sendAnnouncementWhatsAppToNumbers(
   const recipients = Array.from(new Set((phones || []).map(p => (p || '').trim()).filter(Boolean)));
   if (recipients.length === 0) return;
 
+  const safeText = sanitizeParam(text);
+
   const results = await Promise.allSettled(
-    recipients.map(phone => sendTemplateMessage(phone, 'announcement', [text]))
+    recipients.map(phone => sendTemplateMessage(phone, 'announcement', [safeText]))
   );
 
   const failed = results.filter(r => r.status === 'rejected').length;
@@ -380,8 +410,10 @@ export async function sendAnnouncementImageTextWhatsApp(
   const recipients = Array.from(new Set((phones || []).map(p => (p || '').trim()).filter(Boolean)));
   if (recipients.length === 0 || !imageUrl) return;
 
+  const safeText = sanitizeParam(text);
+
   const results = await Promise.allSettled(
-    recipients.map(phone => sendTemplateMessage(phone, 'announcement_image_text', [text], imageUrl))
+    recipients.map(phone => sendTemplateMessage(phone, 'announcement_image_text', [safeText], imageUrl))
   );
 
   const failed = results.filter(r => r.status === 'rejected').length;
