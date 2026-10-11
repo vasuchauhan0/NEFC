@@ -54,6 +54,18 @@ export interface MemberInvestment {
   paidMonths?: string[];
 }
 
+export interface MemberLoan {
+  id: string;
+  principal: number;
+  interestPct: number;      // annual %, flat rate
+  tenureMonths: number;
+  emiAmount: number;
+  startDate: string;
+  purpose?: string;
+  emisPaid: number;
+  status: 'Active' | 'Closed';
+}
+
 export interface Member {
   id: string;
   name: string;
@@ -64,6 +76,7 @@ export interface Member {
   status: 'Active' | 'Inactive';
   memberSince: string;
   investments: MemberInvestment[];
+  loans?: MemberLoan[];
   // KYC Details
   fatherName?: string;
   aadharNumber?: string;

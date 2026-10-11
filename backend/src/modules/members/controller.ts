@@ -20,7 +20,7 @@ const jwtSecret = process.env.JWT_SECRET || 'nefc-secret-key-fallback-987654321'
 export class MemberController {
   async handleMembersAction(req: Request, res: Response): Promise<void> {
     try {
-      const { action, member, id, memberId, investment, investmentId, amount, paidMonths } = req.body;
+      const { action, member, id, memberId, investment, investmentId, amount, paidMonths, loan, loanId, emisPaid } = req.body;
  
       if (action === 'save') {
         // ── Validate & normalize email before saving (defense in depth,
@@ -124,6 +124,44 @@ export class MemberController {
  
         res.json({ success: true, members: list });
  
+      } else if (action === 'add-loan') {
+        const principal = Number(loan?.principal);
+        const interestPct = Number(loan?.interestPct);
+        const tenureMonths = Math.floor(Number(loan?.tenureMonths));
+        if (!memberId || !(principal > 0) || !(interestPct >= 0) || !(tenureMonths > 0) || !loan?.startDate) {
+          res.status(400).json({ success: false, error: 'Please provide a valid loan amount, interest rate, tenure and start date.' });
+          return;
+        }
+        const list = await service.addLoan(memberId, {
+          principal, interestPct, tenureMonths,
+          startDate: loan.startDate,
+          purpose: typeof loan.purpose === 'string' ? loan.purpose.trim() : undefined,
+        });
+
+        const loanMember = list.find(m => m.id === memberId);
+        const newLoan = loanMember?.loans?.at(-1);
+        if (loanMember && newLoan) {
+          sendPushToMember(loanMember.id, {
+            title: 'Loan Sanctioned',
+            body: `A loan of ₹${newLoan.principal} (EMI ₹${newLoan.emiAmount} x ${newLoan.tenureMonths} months) has been added to your account.`,
+          }).catch((err: any) => console.error('[Push] Loan push failed:', err.message));
+        }
+
+        res.json({ success: true, members: list });
+
+      } else if (action === 'delete-loan') {
+        const list = await service.deleteLoan(memberId, loanId);
+        res.json({ success: true, members: list });
+
+      } else if (action === 'update-loan-emis') {
+        const paid = Math.floor(Number(emisPaid));
+        if (isNaN(paid) || paid < 0) {
+          res.status(400).json({ success: false, error: 'Paid EMI count must be zero or more.' });
+          return;
+        }
+        const list = await service.updateLoanEmis(memberId, loanId, paid);
+        res.json({ success: true, members: list });
+
       } else {
         res.status(400).json({ error: 'Invalid action parameter specified' });
       }

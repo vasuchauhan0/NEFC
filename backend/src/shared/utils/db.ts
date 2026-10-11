@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { SiteData, Member, MemberInvestment, InvestmentScheme, ContactMessage } from '../types';
+import { SiteData, Member, MemberInvestment, MemberLoan, InvestmentScheme, ContactMessage } from '../types';
 import { WebSocket } from 'ws';
 
 if (!globalThis.WebSocket) {
@@ -52,7 +52,21 @@ export function rowToInvestment(i: any): MemberInvestment {
   };
 }
 
-export function rowToMember(r: any, investments: any[]): Member {
+export function rowToLoan(l: any): MemberLoan {
+  return {
+    id:           l.id,
+    principal:    Number(l.principal),
+    interestPct:  Number(l.interest_pct),
+    tenureMonths: l.tenure_months,
+    emiAmount:    Number(l.emi_amount),
+    startDate:    l.start_date,
+    purpose:      l.purpose ?? undefined,
+    emisPaid:     l.emis_paid ?? 0,
+    status:       l.status,
+  };
+}
+
+export function rowToMember(r: any, investments: any[], loans: any[] = []): Member {
   return {
     id:              r.id,
     name:            r.name,
@@ -70,6 +84,9 @@ export function rowToMember(r: any, investments: any[]): Member {
     investments: investments
       .filter(i => i.member_id === r.id)
       .map(rowToInvestment),
+    loans: loans
+      .filter(l => l.member_id === r.id)
+      .map(rowToLoan),
   };
 }
 
@@ -101,12 +118,13 @@ export function rowToMessage(r: any): ContactMessage {
 // All other repositories query only the table they need (see each repo file).
 
 export async function getDatabase(): Promise<SiteData> {
-  const [settingsRes, schemesRes, membersRes, messagesRes, investmentsRes] = await Promise.all([
+  const [settingsRes, schemesRes, membersRes, messagesRes, investmentsRes, loansRes] = await Promise.all([
     supabase.from('site_settings').select('key, value'),
     supabase.from('schemes').select('*'),
     supabase.from('members').select('*'),
     supabase.from('contact_messages').select('*'),
     supabase.from('member_investments').select('*'),
+    supabase.from('member_loans').select('*'),
   ]);
 
   const map: Record<string, any> = {};
@@ -123,7 +141,7 @@ export async function getDatabase(): Promise<SiteData> {
     adminFailedAttempts: map['adminFailedAttempts'] ?? 0,
     adminLockoutUntil:   map['adminLockoutUntil']   ?? 0,
     schemes:   (schemesRes.data     || []).map(rowToScheme),
-    members:   (membersRes.data     || []).map((r: any) => rowToMember(r, investmentsRes.data || [])),
+    members:   (membersRes.data     || []).map((r: any) => rowToMember(r, investmentsRes.data || [], loansRes.data || [])),
     messages:  (messagesRes.data    || []).map(rowToMessage),
   };
 }
@@ -162,6 +180,7 @@ export async function saveDatabase(data: Partial<SiteData>): Promise<void> {
 export async function deleteMemberById(id: string): Promise<void> {
   // investments first to avoid FK violations
   await supabase.from('member_investments').delete().eq('member_id', id);
+  await supabase.from('member_loans').delete().eq('member_id', id);
   await supabase.from('members').delete().eq('id', id);
 }
 
@@ -171,6 +190,10 @@ export async function deleteSchemeById(id: string): Promise<void> {
 
 export async function deleteInvestmentById(investmentId: string): Promise<void> {
   await supabase.from('member_investments').delete().eq('id', investmentId);
+}
+
+export async function deleteLoanById(loanId: string): Promise<void> {
+  await supabase.from('member_loans').delete().eq('id', loanId);
 }
 
 export async function deleteMessageById(id: string): Promise<void> {

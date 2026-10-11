@@ -34,8 +34,8 @@ import {
   Menu,
   Search
 } from 'lucide-react';
-import { SiteData, Member, InvestmentScheme, ContactMessage, MemberInvestment } from '../shared/types/index.ts';
-import { formatRupee, formatDateReadable, addYearsToDate, calculateFDMaturity, calculateRDMaturity } from '../shared/utils/index.ts';
+import { SiteData, Member, InvestmentScheme, ContactMessage, MemberInvestment, MemberLoan } from '../shared/types/index.ts';
+import { formatRupee, formatDateReadable, addYearsToDate, calculateFDMaturity, calculateRDMaturity, calculateLoanEMI } from '../shared/utils/index.ts';
 import PassbookModal from '../features/member/components/PassbookModal.tsx';
 
 interface AdminPortalProps {
@@ -92,7 +92,16 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
   // State for unified member details & investment control modal
   const [selectedDetailMemberId, setSelectedDetailMemberId] = useState<string | null>(null);
   const [passbookMember, setPassbookMember] = useState<Member | null>(null);
-  const [activeInvestmentSubTab, setActiveInvestmentSubTab] = useState<'fd' | 'rd'>('fd');
+  const [activeInvestmentSubTab, setActiveInvestmentSubTab] = useState<'fd' | 'rd' | 'loan'>('fd');
+  const [inlineLoan, setInlineLoan] = useState({
+    principal: 50000,
+    interestPct: 12,
+    tenureMonths: 12,
+    startDate: new Date().toISOString().split('T')[0],
+    purpose: ''
+  });
+  const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
+  const [editingLoanEmis, setEditingLoanEmis] = useState<number>(0);
   const [inlineInvestment, setInlineInvestment] = useState({
     schemeId: '',
     amount: 100000,
@@ -859,6 +868,90 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
       triggerToast('Server connection failed', 'error');
     }
     setEditingPaidMonthsId(null);
+  };
+
+  // ── LOAN HANDLERS ───────────────────────────────────────────────────────────
+  const postMemberAction = async (body: Record<string, any>) => {
+    const API = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API}/api/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-token': localStorage.getItem('nefc_admin_token') || '',
+      },
+      body: JSON.stringify(body),
+    });
+    return response.json();
+  };
+
+  const handleInlineAddLoan = async () => {
+    if (!selectedDetailMemberId) return;
+    const mem = safeData.members.find(m => m.id === selectedDetailMemberId);
+    if (!mem) return;
+    if (!(inlineLoan.principal > 0) || !(inlineLoan.tenureMonths > 0) || inlineLoan.interestPct < 0 || !inlineLoan.startDate) {
+      triggerToast('Enter a valid loan amount, interest rate, tenure and start date', 'error');
+      return;
+    }
+    try {
+      const data = await postMemberAction({
+        action: 'add-loan',
+        memberId: selectedDetailMemberId,
+        loan: inlineLoan,
+      });
+      if (data.success) {
+        await onUpdateData({ ...siteData, members: data.members || [] });
+        triggerToast(`Loan sanctioned for ${mem.name}`, 'success');
+        setInlineLoan(prev => ({ ...prev, principal: 50000, purpose: '' }));
+      } else {
+        triggerToast(data.error || 'Failed to add loan', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to add loan:', err);
+      triggerToast('Server connection failed', 'error');
+    }
+  };
+
+  const handleDeleteLoan = (memberId: string, loanId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Loan Record',
+      message: 'Are you sure you want to permanently delete this loan record? This action is irreversible.',
+      onConfirm: async () => {
+        try {
+          const data = await postMemberAction({ action: 'delete-loan', memberId, loanId });
+          if (data.success) {
+            await onUpdateData({ ...siteData, members: data.members || [] });
+            triggerToast('Loan record deleted', 'success');
+          } else {
+            triggerToast(data.error || 'Failed to delete loan', 'error');
+          }
+        } catch (err) {
+          console.error('Failed to delete loan:', err);
+          triggerToast('Server connection failed', 'error');
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const handleUpdateLoanEmis = async (memberId: string, loanId: string, emisPaid: number) => {
+    if (emisPaid < 0 || isNaN(emisPaid)) {
+      triggerToast('Paid EMI count cannot be negative', 'error');
+      return;
+    }
+    try {
+      const data = await postMemberAction({ action: 'update-loan-emis', memberId, loanId, emisPaid });
+      if (data.success) {
+        await onUpdateData({ ...siteData, members: data.members || [] });
+        triggerToast('Loan EMI progress updated', 'success');
+      } else {
+        triggerToast(data.error || 'Failed to update EMIs', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to update loan EMIs:', err);
+      triggerToast('Server connection failed', 'error');
+    }
+    setEditingLoanId(null);
   };
 
   // OTHER ADMIN WRITES
@@ -3425,6 +3518,13 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
         const totalFDValue = fdBonds.reduce((acc, curr) => acc + curr.amount, 0);
         const totalRDCommitment = rdBonds.reduce((acc, curr) => acc + curr.amount, 0);
 
+        const memberLoans: MemberLoan[] = detailMember.loans || [];
+        const activeLoans = memberLoans.filter(l => l.status === 'Active');
+        const totalLoanOutstanding = activeLoans.reduce(
+          (acc, l) => acc + Math.max(0, l.emiAmount * (l.tenureMonths - l.emisPaid)), 0
+        );
+        const loanPreview = calculateLoanEMI(inlineLoan.principal, inlineLoan.interestPct, inlineLoan.tenureMonths);
+
         // Filter scheme choices for the active inline adding tab
         const activeSchemes = safeData.schemes.filter(
           s => s.type === activeInvestmentSubTab && s.status !== 'Closed'
@@ -3552,6 +3652,11 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                     <span className="font-mono text-base font-black text-slate-800">{formatRupee(totalRDCommitment)}</span>
                     <span className="text-[9px] text-slate-400 block mt-0.5">{rdBonds.length} accounts booked</span>
                   </div>
+                  <div className="pt-2 border-t border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">Loan Outstanding (EMIs due):</span>
+                    <span className="font-mono text-base font-black text-amber-700">{formatRupee(totalLoanOutstanding)}</span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5">{activeLoans.length} active loan(s)</span>
+                  </div>
                 </div>
               </div>
 
@@ -3594,9 +3699,209 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   >
                     Recurring Deposits (RD) Roster
                   </button>
+                  <button
+                    onClick={() => setActiveInvestmentSubTab('loan')}
+                    className={`flex-1 py-3 text-center text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                      activeInvestmentSubTab === 'loan'
+                        ? 'border-amber-600 text-amber-700 bg-amber-50/20'
+                        : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/30'
+                    }`}
+                  >
+                    Loans Roster
+                  </button>
                 </div>
 
-                {/* View Panel Lists & Action */}
+                {/* LOANS PANEL */}
+                {activeInvestmentSubTab === 'loan' ? (
+                <div className="flex-1 overflow-y-auto pr-1 space-y-6 max-h-[50vh]">
+                  <div className="space-y-3">
+                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex justify-between">
+                      <span>Member loans</span>
+                      <span className="font-mono text-slate-500">({memberLoans.length} items)</span>
+                    </h5>
+
+                    <div className="space-y-2.5">
+                      {memberLoans.map(loan => {
+                        const outstanding = Math.max(0, loan.emiAmount * (loan.tenureMonths - loan.emisPaid));
+                        const pct = Math.min(100, Math.round((loan.emisPaid / loan.tenureMonths) * 100));
+                        return (
+                          <div key={loan.id} className="border border-slate-100 p-3 rounded-2xl bg-slate-50/60 hover:bg-slate-50 transition-colors flex justify-between items-start gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-4 flex-1 text-xs">
+                              <div>
+                                <span className="block text-[8px] font-bold text-slate-400 uppercase">Loan ID</span>
+                                <span className="font-mono font-bold text-slate-700 text-[10px]">{loan.id}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-bold text-slate-400 uppercase">Principal</span>
+                                <span className="font-mono font-black text-amber-800 text-xs">{formatRupee(loan.principal)}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-bold text-slate-400 uppercase">Terms</span>
+                                <span className="font-semibold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] inline-block mt-0.5">
+                                  {loan.tenureMonths} mo @ {loan.interestPct}% flat p.a.
+                                </span>
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-bold text-slate-400 uppercase">Monthly EMI</span>
+                                <span className="font-mono font-bold text-slate-800 text-xs">{formatRupee(loan.emiAmount)}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-bold text-slate-400 uppercase">EMIs Paid</span>
+                                {editingLoanId === loan.id ? (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={loan.tenureMonths}
+                                      value={editingLoanEmis}
+                                      onChange={(e) => setEditingLoanEmis(parseInt(e.target.value) || 0)}
+                                      className="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-mono font-bold text-xs focus:outline-none"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleUpdateLoanEmis(detailMember.id, loan.id, editingLoanEmis)}
+                                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                                      title="Save"
+                                    >
+                                      <Check size={12} />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingLoanId(null)}
+                                      className="p-1 text-slate-400 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono font-bold text-slate-800 text-xs">{loan.emisPaid} / {loan.tenureMonths}</span>
+                                    <button
+                                      onClick={() => {
+                                        setEditingLoanId(loan.id);
+                                        setEditingLoanEmis(loan.emisPaid);
+                                      }}
+                                      className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                      title="Edit paid EMIs"
+                                    >
+                                      <Edit size={11} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-bold text-slate-400 uppercase">Outstanding</span>
+                                <span className="font-mono font-bold text-red-700 text-xs">{formatRupee(outstanding)}</span>
+                              </div>
+                              <div className="col-span-2 md:col-span-3">
+                                <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-500 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                              <div className="col-span-2 md:col-span-3 text-[10px] text-slate-400 flex items-center gap-1 border-t border-slate-100/50 pt-1">
+                                <Calendar size={10} />
+                                <span>
+                                  Started {loan.startDate}
+                                  {loan.purpose ? ` · ${loan.purpose}` : ''}
+                                  {' · '}
+                                  <span className={loan.status === 'Closed' ? 'text-emerald-600 font-bold' : 'text-amber-700 font-bold'}>
+                                    {loan.status}
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteLoan(detailMember.id, loan.id)}
+                              className="text-slate-400 hover:text-red-700 p-2 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-100 rounded-xl cursor-pointer transition-all"
+                              title="Delete loan record"
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {memberLoans.length === 0 && (
+                        <p className="text-center text-slate-450 text-xs py-10 bg-slate-50 rounded-2xl border border-slate-100 italic">
+                          No loans found in member's account.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Add loan form */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
+                    <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3.5 flex items-center gap-1.5 select-none">
+                      <Sparkles size={12} className="text-amber-600" />
+                      <span>Sanction New Loan</span>
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Loan Amount</label>
+                        <input
+                          type="number"
+                          value={inlineLoan.principal}
+                          onChange={(e) => setInlineLoan({ ...inlineLoan, principal: parseInt(e.target.value) || 0 })}
+                          className="block w-full px-2.5 py-1.5 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs font-bold font-mono focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Flat Interest % (p.a.)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={inlineLoan.interestPct}
+                          onChange={(e) => setInlineLoan({ ...inlineLoan, interestPct: parseFloat(e.target.value) || 0 })}
+                          className="block w-full px-2.5 py-1.5 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs font-bold font-mono focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Tenure (months)</label>
+                        <input
+                          type="number"
+                          value={inlineLoan.tenureMonths}
+                          onChange={(e) => setInlineLoan({ ...inlineLoan, tenureMonths: parseInt(e.target.value) || 0 })}
+                          className="block w-full px-2.5 py-1.5 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs font-bold font-mono focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Start Date</label>
+                        <input
+                          type="date"
+                          value={inlineLoan.startDate}
+                          onChange={(e) => setInlineLoan({ ...inlineLoan, startDate: e.target.value })}
+                          className="block w-full px-2.5 py-1.5 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs font-semibold font-mono focus:outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-1 lg:col-span-2">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Purpose (optional)</label>
+                        <input
+                          type="text"
+                          value={inlineLoan.purpose}
+                          onChange={(e) => setInlineLoan({ ...inlineLoan, purpose: e.target.value })}
+                          placeholder="e.g. Business, Education, Medical"
+                          className="block w-full px-2.5 py-1.5 border border-slate-200 bg-white text-slate-800 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px]">
+                        <span className="text-slate-500">Monthly EMI: <b className="font-mono text-slate-800">{formatRupee(loanPreview.emi)}</b></span>
+                        <span className="text-slate-500">Total interest: <b className="font-mono text-slate-800">{formatRupee(loanPreview.totalInterest)}</b></span>
+                        <span className="text-slate-500">Total payable: <b className="font-mono text-slate-800">{formatRupee(loanPreview.totalPayable)}</b></span>
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-3 text-right mt-1">
+                        <button
+                          onClick={handleInlineAddLoan}
+                          className="font-semibold text-xs px-5 py-2 rounded-xl text-white cursor-pointer transition-all bg-amber-600 hover:bg-amber-700"
+                        >
+                          ✓ Confirm and Add Loan
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                ) : (
                 <div className="flex-1 overflow-y-auto pr-1 space-y-6 max-h-[50vh]">
                   
                   {/* Ledger list */}
@@ -3885,6 +4190,7 @@ export default function AdminPortal({ siteData, onUpdateData, onExit }: AdminPor
                   </div>
 
                 </div>
+                )}
 
               </div>
             </div>

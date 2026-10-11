@@ -9,6 +9,19 @@ export function formatRupee(amount: number): string {
   });
 }
 
+export function calculateLoanEMI(principal: number, annualRate: number, months: number): {
+  emi: number;
+  totalPayable: number;
+  totalInterest: number;
+} {
+  if (!(principal > 0) || !(months > 0)) return { emi: 0, totalPayable: 0, totalInterest: 0 };
+  // Flat rate: interest on the full principal for the whole tenure.
+  const interest = (principal * annualRate * (months / 12)) / 100;
+  const emi = Math.round((principal + interest) / months);
+  const totalPayable = emi * months;
+  return { emi, totalPayable, totalInterest: totalPayable - principal };
+}
+
 export function calculateFDMaturity(principal: number, annualRate: number, years: number): {
   maturityAmount: number;
   interestEarned: number;
@@ -140,4 +153,3 @@ export function formatDurationShort(years: number): string {
   }
   return parts.join(' ');
 }
-

@@ -1,10 +1,20 @@
-import { deleteMemberById, deleteInvestmentById, supabase } from '../../shared/utils/db';
-import { Member, MemberInvestment } from '../../shared/types';
+import { deleteMemberById, deleteInvestmentById, deleteLoanById, rowToLoan, supabase } from '../../shared/utils/db';
+import { Member, MemberInvestment, MemberLoan } from '../../shared/types';
+
+// Flat-rate EMI: interest = principal x rate% x years, charged on the full principal
+// for the whole tenure. EMI = (principal + interest) / months.
+// Computed server-side so the stored value is authoritative.
+export function computeEmi(principal: number, annualPct: number, months: number): number {
+  if (months <= 0) return 0;
+  const interest = (principal * annualPct * (months / 12)) / 100;
+  return Math.round((principal + interest) / months);
+}
 
 export class MemberRepository {
   async getAll(): Promise<Member[]> {
     const { data: membersData } = await supabase.from('members').select('*');
     const { data: investmentsData } = await supabase.from('member_investments').select('*');
+    const { data: loansData } = await supabase.from('member_loans').select('*');
 
     return (membersData || []).map((r: any) => ({
       id: r.id,
@@ -35,6 +45,9 @@ export class MemberRepository {
           status: i.status,
           paidMonths: i.paid_months ?? [],
         })),
+      loans: (loansData || [])
+        .filter((l: any) => l.member_id === r.id)
+        .map(rowToLoan),
     }));
   }
 
@@ -106,6 +119,40 @@ export class MemberRepository {
 
   async updatePaidMonths(memberId: string, investmentId: string, paidMonths: string[]): Promise<Member[]> {
     await supabase.from('member_investments').update({ paid_months: paidMonths }).eq('id', investmentId);
+    return this.getAll();
+  }
+
+  async addLoan(memberId: string, loan: Pick<MemberLoan, 'principal' | 'interestPct' | 'tenureMonths' | 'startDate' | 'purpose'>): Promise<Member[]> {
+    const loanId = `LN-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const { error } = await supabase.from('member_loans').insert({
+      id: loanId,
+      member_id: memberId,
+      principal: loan.principal,
+      interest_pct: loan.interestPct,
+      tenure_months: loan.tenureMonths,
+      emi_amount: computeEmi(loan.principal, loan.interestPct, loan.tenureMonths),
+      start_date: loan.startDate,
+      purpose: loan.purpose || null,
+      emis_paid: 0,
+      status: 'Active',
+    });
+    if (error) throw new Error(error.message);
+    return this.getAll();
+  }
+
+  async deleteLoan(memberId: string, loanId: string): Promise<Member[]> {
+    await deleteLoanById(loanId);
+    return this.getAll();
+  }
+
+  async updateLoanEmis(memberId: string, loanId: string, emisPaid: number): Promise<Member[]> {
+    const { data: loan } = await supabase.from('member_loans').select('tenure_months').eq('id', loanId).single();
+    const tenure = loan?.tenure_months ?? emisPaid;
+    const paid = Math.max(0, Math.min(emisPaid, tenure));
+    await supabase.from('member_loans').update({
+      emis_paid: paid,
+      status: paid >= tenure ? 'Closed' : 'Active',
+    }).eq('id', loanId);
     return this.getAll();
   }
 }

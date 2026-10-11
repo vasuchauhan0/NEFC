@@ -4,6 +4,7 @@ import DashboardStats from '../components/DashboardStats.tsx';
 import InvestmentCard from '../components/InvestmentCard.tsx';
 import MemberTransactionsModal from '../components/MemberTransactionsModal.tsx';
 import PolicyDetailsModal from '../components/PolicyDetailsModal.tsx';
+import LoansSection from '../components/LoansSection.tsx';
 import { Member, Company } from '../../../shared/types/index.ts';
 
 interface DashboardPageProps {
@@ -146,6 +147,8 @@ export default function DashboardPage({ member, contactEmail, onLogout, company 
             </div>
           )}
         </div>
+
+        <LoansSection loans={member.loans || []} />
 
         <div className="bg-slate-50 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between border border-slate-200/70 text-slate-600 text-xs sm:text-sm gap-4">
           <div className="flex items-center gap-2">

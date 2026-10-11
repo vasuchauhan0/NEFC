@@ -1,5 +1,5 @@
 import { MemberRepository } from './repository.ts';
-import { Member, MemberInvestment } from '../../shared/types/index.ts';
+import { Member, MemberInvestment, MemberLoan } from '../../shared/types/index.ts';
 
 const repository = new MemberRepository();
 
@@ -34,5 +34,17 @@ export class MemberService {
 
   async updatePaidMonths(memberId: string, investmentId: string, paidMonths: string[]): Promise<Member[]> {
     return repository.updatePaidMonths(memberId, investmentId, paidMonths);
+  }
+
+  async addLoan(memberId: string, loan: Pick<MemberLoan, 'principal' | 'interestPct' | 'tenureMonths' | 'startDate' | 'purpose'>): Promise<Member[]> {
+    return repository.addLoan(memberId, loan);
+  }
+
+  async deleteLoan(memberId: string, loanId: string): Promise<Member[]> {
+    return repository.deleteLoan(memberId, loanId);
+  }
+
+  async updateLoanEmis(memberId: string, loanId: string, emisPaid: number): Promise<Member[]> {
+    return repository.updateLoanEmis(memberId, loanId, emisPaid);
   }
 }
