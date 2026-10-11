@@ -69,7 +69,7 @@ export default function LoansSection({ loans }: LoansSectionProps) {
                 </div>
                 <div>
                   <span className="block text-[9px] font-bold text-slate-400 uppercase">Interest Rate</span>
-                  <span className="font-semibold text-slate-700">{loan.interestPct}% p.a. (flat)</span>
+                  <span className="font-semibold text-slate-700">{loan.interestPct}% p.a.</span>
                 </div>
                 <div>
                   <span className="block text-[9px] font-bold text-slate-400 uppercase">Tenure</span>
